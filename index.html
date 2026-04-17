@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mini Minecraft Three.js</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+    <div id="crosshair"></div>
+    <div id="instructions">
+        <h2>Mini Minecraft</h2>
+        <p><b>Click để chơi</b></p>
+        <p>WASD: Di chuyển | Space: Nhảy</p>
+        <p>Chuột trái: Đập | Chuột phải: Đặt</p>
+    </div>
+    <div id="hotbar">
+        </div>
+
+    <div id="inventory-menu" style="display: none;">
+        <h2>Kho đồ</h2>
+        <div id="inventory-grid">
+            </div>
+    </div>
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+                "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+            }
+        }
+    </script>
+
+    <script type="module" src="main.js"></script>
+</body>
+</html>
