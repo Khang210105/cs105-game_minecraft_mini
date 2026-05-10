@@ -130,7 +130,12 @@ export class Player {
         if (this.keys.a) moveDir.sub(right);
         moveDir.normalize();
 
-        const moveSpeed = 5.0; // Tốc độ đi bộ: 5 block/giây
+        // Kiểm tra xem chân nhân vật có đang chạm nước không
+        const feetY = Math.floor(this.position.y - this.eyeLevel + 0.1);
+        const blockAtFeet = this.world.getBlock(this.position.x, feetY, this.position.z);
+
+        let moveSpeed = 5.0; // Tốc độ đi bộ: 5 block/giây
+
         const dx = moveDir.x * moveSpeed * delta;
         const dy = this.velocity.y * delta;
         const dz = moveDir.z * moveSpeed * delta;

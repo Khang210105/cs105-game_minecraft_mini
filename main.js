@@ -78,6 +78,13 @@ function animate() {
     interaction.update();
     // THÊM DÒNG NÀY: Để tính toán rơi cho mảnh vụn
     world.update(delta);
+
+    // THÊM DÒNG NÀY: Để làm nước và lava chảy
+    blockEngine.updateFluids(delta);
+
+    // THÊM DÒNG NÀY: Nước chảy lan ra xung quanh
+    world.tickFluids(delta);
+
     renderer.render(scene, camera);
 }
 animate();

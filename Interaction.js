@@ -24,39 +24,121 @@ export class Interaction {
         this.initEventListeners();
     }
 
+    // --- MỚI: HÀM LỌC CHẤT LỎNG ---
+    getValidTarget(intersects) {
+        const currentItem = this.inventory.getCurrentBlock();
+
+        for (let i = 0; i < intersects.length; i++) {
+            let target = intersects[i].object;
+            if (target.parent && target.parent.type === 'Group') target = target.parent;
+            
+            // Nếu đang cầm xô trống -> Cho phép nhắm trúng chất lỏng
+            if (currentItem && currentItem.isBucket && currentItem.isEmpty) {
+                if (target.userData.type.isFluid) return { intersect: intersects[i], block: target };
+            }
+            
+            // Bình thường: Xuyên qua chất lỏng
+            if (!target.userData.type.isFluid) {
+                return { intersect: intersects[i], block: target };
+            }
+        }
+        return null; 
+    }
+
     initEventListeners() {
         window.addEventListener('mousedown', (e) => {
             if (!this.player.controls.isLocked) return;
 
             this.raycaster.setFromCamera(this.mouse, this.player.camera);
-            // THÊM 'true' VÀO ĐÂY ĐỂ QUÉT XUYÊN VÀO GROUP
+            // THÊM true ĐỂ TIA NHÌN QUÉT TRÚNG LÁ CÂY/CỎ
             const intersects = this.raycaster.intersectObjects(this.world.blocks, true); 
+            
+            if (intersects.length === 0) return;
 
-            if (intersects.length > 0) {
-                const intersect = intersects[0];
-                let targetBlock = intersect.object;
-
-                // TÌM VỀ BLOCK CHA NẾU TRÚNG MẶT PHẲNG LÁ CỦA CÂY
-                if (targetBlock.parent && targetBlock.parent.type === 'Group') {
-                    targetBlock = targetBlock.parent;
+            const currentItem = this.inventory.getCurrentBlock();
+            
+            // --- HÀM GIẢI MÃ GROUP (Biến mảnh lá thành cụm cỏ) ---
+            const getResolvedObject = (intersect) => {
+                let obj = intersect.object;
+                if (obj.parent && obj.parent.type === 'Group') {
+                    return obj.parent;
                 }
+                return obj;
+            };
+            
+            let targetHit = null;
+            
+            // 1. Tìm khối chất lỏng (Check an toàn 3 lớp)
+            const firstFluid = intersects.find(i => {
+                const obj = getResolvedObject(i);
+                return obj.userData && obj.userData.type && obj.userData.type.isFluid === true;
+            });
 
-                if (intersect.distance <= this.limit) {
-                    if (e.button === 0) {
-                        this.world.removeBlock(targetBlock); // Dùng targetBlock
-                    } else if (e.button === 2) {
-                        const pos = targetBlock.position.clone().add(intersect.face.normal); // Dùng targetBlock
-                        
-                        if (!this.player.intersectsBlock(pos.x, pos.y, pos.z)) {
-                            const currentBlockType = this.inventory.getCurrentBlock();
-                            if (currentBlockType) {
-                                this.world.addBlock(pos.x, pos.y, pos.z, currentBlockType);
+            // 2. Tìm khối cứng hoặc cỏ (Check an toàn 3 lớp)
+            const firstSolid = intersects.find(i => {
+                const obj = getResolvedObject(i);
+                return !(obj.userData && obj.userData.type && obj.userData.type.isFluid === true);
+            });
+
+            // Ưu tiên múc nước nếu cầm xô
+            if (currentItem && currentItem.isBucket && firstFluid) {
+                if (!firstSolid || firstFluid.distance < firstSolid.distance) {
+                    targetHit = { intersect: firstFluid, block: getResolvedObject(firstFluid) };
+                }
+            }
+
+            // Nếu không, tương tác với khối cứng/cỏ biển
+            if (!targetHit && firstSolid) {
+                targetHit = { intersect: firstSolid, block: getResolvedObject(firstSolid) };
+            }
+
+            if (targetHit && targetHit.intersect.distance <= this.limit) {
+                let targetBlock = targetHit.block; // Chắc chắn là cụm cỏ gốc (0,0,0 của cỏ, không phải lá)
+
+                const isFluid = targetBlock.userData && targetBlock.userData.type && targetBlock.userData.type.isFluid;
+
+                if (e.button === 0) { // Chuột trái: Đập block
+                    if (!isFluid) {
+                        this.world.removeBlock(targetBlock);
+                    }
+                } else if (e.button === 2) { // Chuột phải: Đặt block / Múc nước
+                    // Tính vị trí đặt block dựa trên block gốc
+                    const pos = targetBlock.position.clone().add(targetHit.intersect.face.normal);
+                    
+                    if (currentItem && currentItem.isBucket) {
+                        if (currentItem.isEmpty && isFluid) {
+                            if (targetBlock.userData.isSource) {
+                                this.world.clearWaterNetwork(
+                                    targetBlock.userData.gridPos.x, 
+                                    targetBlock.userData.gridPos.y, 
+                                    targetBlock.userData.gridPos.z, 
+                                    targetBlock.userData.type.id
+                                );
+                                const bucketType = targetBlock.userData.type.id === BLOCK_TYPES.LAVA.id ? 
+                                                   BLOCK_TYPES.BUCKET_LAVA : BLOCK_TYPES.BUCKET_WATER;
+                                this.inventory.slots[this.inventory.activeSlotIndex] = bucketType;
+                                this.inventory.renderHotbar();
                             }
+                        } 
+                        else if (!currentItem.isEmpty) {
+                            let fluidToPour = currentItem.id === BLOCK_TYPES.BUCKET_LAVA.id ? 
+                                              BLOCK_TYPES.LAVA : BLOCK_TYPES.WATER;
+                            this.world.addBlock(pos.x, pos.y, pos.z, fluidToPour);
+                            this.inventory.slots[this.inventory.activeSlotIndex] = BLOCK_TYPES.BUCKET_EMPTY;
+                            this.inventory.renderHotbar();
+                        }
+                        return; 
+                    }
+                    
+                    if (!this.player.intersectsBlock(pos.x, pos.y, pos.z)) {
+                        if (currentItem && !currentItem.isBucket) {
+                            this.world.addBlock(pos.x, pos.y, pos.z, currentItem);
                         }
                     }
                 }
             }
         });
+        
         window.addEventListener('contextmenu', e => e.preventDefault());
     }
 
@@ -67,18 +149,31 @@ export class Interaction {
         }
 
         this.raycaster.setFromCamera(this.mouse, this.player.camera);
-        // THÊM 'true' VÀO ĐÂY NỮA (Để khung viền đen hiển thị đúng ở cây)
         const intersects = this.raycaster.intersectObjects(this.world.blocks, true);
 
-        if (intersects.length > 0 && intersects[0].distance <= this.limit) {
-            let target = intersects[0].object;
+        let targetIntersect = null;
+        let targetBlock = null;
+
+        for (let i = 0; i < intersects.length; i++) {
+            let obj = intersects[i].object;
             
-            // XỬ LÝ TƯƠNG TỰ CHO KHUNG VIỀN ĐEN
-            if (target.parent && target.parent.type === 'Group') {
-                target = target.parent;
+            // Giải mã Group cho viền đen
+            if (obj.parent && obj.parent.type === 'Group') {
+                obj = obj.parent;
             }
 
-            this.selectionBox.position.copy(target.position);
+            // Check an toàn 3 lớp
+            const isFluid = obj.userData && obj.userData.type && obj.userData.type.isFluid === true;
+            
+            if (!isFluid) {
+                targetIntersect = intersects[i]; 
+                targetBlock = obj; 
+                break;
+            }
+        }
+
+        if (targetIntersect && targetIntersect.distance <= this.limit) {
+            this.selectionBox.position.copy(targetBlock.position); 
             this.selectionBox.visible = true;
         } else {
             this.selectionBox.visible = false;

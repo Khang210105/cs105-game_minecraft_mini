@@ -10,6 +10,9 @@ export class BlockEngine {
         this.cubeGeometry = new THREE.BoxGeometry(1, 1, 1);
         this.planeGeometry = new THREE.PlaneGeometry(1, 1); // Dùng cho cây cỏ
         this.textureLoader = new THREE.TextureLoader();
+
+        // MỚI: Danh sách chứa vật liệu chất lỏng để làm animation
+        this.fluidMaterials = [];
     }
 
     loadPixelTexture(url) {
@@ -17,6 +20,11 @@ export class BlockEngine {
         texture.magFilter = THREE.NearestFilter;
         texture.minFilter = THREE.NearestFilter;
         texture.colorSpace = THREE.SRGBColorSpace; 
+
+        // MỚI: Bắt buộc phải có 2 dòng này thì ảnh mới cuộn tròn liên tục được
+        texture.wrapS = THREE.RepeatWrapping;
+        texture.wrapT = THREE.RepeatWrapping;
+
         return texture;
     }
 
@@ -42,6 +50,24 @@ export class BlockEngine {
             object3D.add(plane1);
             object3D.add(plane2);
         } 
+        else if (type.isFluid) {
+            // MỚI: XỬ LÝ CHẤT LỎNG
+            const materialConfig = {
+                map: this.loadPixelTexture(type.texture),
+                transparent: type.transparent || false,
+                opacity: type.opacity || 1,
+            };
+            if (type.emissive) {
+                materialConfig.emissive = new THREE.Color(type.emissive);
+                materialConfig.emissiveIntensity = type.intensity || 1;
+            }
+
+            const material = new THREE.MeshStandardMaterial(materialConfig);
+            object3D = new THREE.Mesh(this.cubeGeometry, material);
+            
+            // Lưu material này lại để tí nữa bắt nó chuyển động
+            this.fluidMaterials.push(material);
+        }
         // XỬ LÝ KHỐI LẬP PHƯƠNG BÌNH THƯỜNG
         else {
             let materials;
@@ -71,5 +97,15 @@ export class BlockEngine {
 
         this.scene.add(object3D);
         return object3D;
+    }
+    // MỚI: Hàm này sẽ được gọi liên tục mỗi khung hình (60 FPS)
+    updateFluids(delta) {
+        this.fluidMaterials.forEach(mat => {
+            if (mat.map) {
+                // Trừ dần trục Y để tạo cảm giác nước chảy từ trên xuống
+                // Chỉnh số 0.5 to lên nếu muốn chảy nhanh hơn
+                mat.map.offset.y -= 0.5 * delta; 
+            }
+        });
     }
 }

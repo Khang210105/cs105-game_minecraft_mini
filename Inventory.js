@@ -15,8 +15,9 @@ export class Inventory {
     }
 
     initDefaultItems() {
-        // Cho sẵn vài block vào các ô đầu tiên
-        const types = Object.values(BLOCK_TYPES);
+        // Lọc ra các block KHÔNG bị ẩn (không có hideInInventory)
+        const types = Object.values(BLOCK_TYPES).filter(t => !t.hideInInventory);
+        
         for (let i = 0; i < Math.min(8, types.length); i++) {
             this.slots[i] = types[i];
         }
@@ -79,7 +80,7 @@ export class Inventory {
         const gridUI = document.getElementById('inventory-grid');
         gridUI.innerHTML = '';
 
-        Object.values(BLOCK_TYPES).forEach(type => {
+        Object.values(BLOCK_TYPES).filter(t => !t.hideInInventory).forEach(type => {
             const itemDiv = document.createElement('div');
             itemDiv.className = 'inv-item';
             
