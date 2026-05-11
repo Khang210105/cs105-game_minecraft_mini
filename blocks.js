@@ -17,7 +17,7 @@ export const BLOCK_TYPES = {
     },
     DIRT:  { id: 2, name: 'Dirt',  color: 0xffffff, texture: './textures/blocks/dirt.png',  solid: true },
     STONE: { id: 3, name: 'Stone', color: 0xffffff, texture: './textures/blocks/stone.png', solid: true },
-    GLASS: { id: 4, name: 'Glass', color: 0xffffff, texture: './textures/blocks/glass.png', transparent: true, opacity: 0.6 },
+    GLASS: { id: 4, name: 'Glass', color: 0xffffff, texture: './textures/blocks/glass.png', transparent: true, solid: true, opacity: 0.6 },
     IRON_ORE: { id: 5, name: 'Iron_ore', color: 0xffffff, texture: './textures/blocks/iron_ore.png', solid: true },
     IRON_BLOCK: { id: 6, name: 'Iron_block', color: 0xffffff, texture: './textures/blocks/iron_block.png', solid: true },
     SEA_GRASS: { id: 7, name: 'Sea_grass', texture: './textures/blocks/seagrass_carried.png', solid: false, isPlant: true, transparent: true },

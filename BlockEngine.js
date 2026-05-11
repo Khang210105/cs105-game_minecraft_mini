@@ -49,6 +49,12 @@ export class BlockEngine {
 
             object3D.add(plane1);
             object3D.add(plane2);
+
+            plane1.castShadow = true;
+            plane1.receiveShadow = true;
+
+            plane2.castShadow = true;
+            plane2.receiveShadow = true;
         } 
         else if (type.isFluid) {
             // MỚI: XỬ LÝ CHẤT LỎNG
@@ -90,6 +96,8 @@ export class BlockEngine {
             }
 
             object3D = new THREE.Mesh(this.cubeGeometry, materials);
+            object3D.castShadow = true;
+            object3D.receiveShadow = true;
         }
 
         object3D.position.set(x, y, z);
