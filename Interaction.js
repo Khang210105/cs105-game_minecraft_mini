@@ -108,12 +108,7 @@ export class Interaction {
                     if (currentItem && currentItem.isBucket) {
                         if (currentItem.isEmpty && isFluid) {
                             if (targetBlock.userData.isSource) {
-                                this.world.clearWaterNetwork(
-                                    targetBlock.userData.gridPos.x, 
-                                    targetBlock.userData.gridPos.y, 
-                                    targetBlock.userData.gridPos.z, 
-                                    targetBlock.userData.type.id
-                                );
+                                this.world.removeBlock(targetBlock)
                                 const bucketType = targetBlock.userData.type.id === BLOCK_TYPES.LAVA.id ? 
                                                    BLOCK_TYPES.BUCKET_LAVA : BLOCK_TYPES.BUCKET_WATER;
                                 this.inventory.slots[this.inventory.activeSlotIndex] = bucketType;

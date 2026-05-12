@@ -23,7 +23,7 @@ export const BLOCK_TYPES = {
     SEA_GRASS: { id: 7, name: 'Sea_grass', texture: './textures/blocks/seagrass_carried.png', solid: false, isPlant: true, transparent: true },
     BED_ROCK: { id: 8, name: 'Bed_rock', color: 0xffffff, texture: './textures/blocks/bedrock.png', solid: true },
     WATER: { 
-        id: 8, name: 'Water', 
+        id: 9, name: 'Water', 
         texture: './textures/blocks/water_still.png', 
         transparent: true, opacity: 0.8, 
         solid: false, isFluid: true,
@@ -31,7 +31,7 @@ export const BLOCK_TYPES = {
         hideInInventory: true
     },
     LAVA: { 
-        id: 9, name: 'Lava', 
+        id: 10, name: 'Lava', 
         texture: './textures/blocks/lava_still.png', 
         emissive: 0xff5500, intensity: 1, // Tự phát sáng trong đêm
         solid: false, isFluid: true,
@@ -39,14 +39,14 @@ export const BLOCK_TYPES = {
         hideInInventory: true
     },
     BUCKET_EMPTY: {
-        id: 10, name: 'Empty Bucket',
+        id: 11, name: 'Empty Bucket',
         isItem: true,
         texture: './textures/blocks/empty_bucket.png', // Tải tạm 1 ảnh xô trống nhé
         transparent: true, solid: false,
         isItem: true, isBucket: true, isEmpty: true
     },
     BUCKET_WATER: {
-        id: 11, name: 'Water Bucket',
+        id: 12, name: 'Water Bucket',
         isItem: true,
         texture: './textures/blocks/bucket_water.png',
         transparent: true, solid: false,
