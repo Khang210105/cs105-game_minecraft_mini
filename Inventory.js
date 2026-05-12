@@ -51,6 +51,11 @@ export class Inventory {
         return icon;
     }
 
+    updateCurrentSlot(newBlockType) {
+        this.slots[this.activeSlotIndex] = newBlockType;
+        this.renderHotbar();
+    }
+
     // --- RENDER GIAO DIỆN ---
     renderHotbar() {
         const hotbarUI = document.getElementById('hotbar');

@@ -18,7 +18,7 @@ const camera = new THREE.PerspectiveCamera(
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setSize(window.innerWidth, window.innerHeight);
 document.body.appendChild(renderer.domElement);
-
+renderer.outputColorSpace = THREE.SRGBColorSpace;
 /* BẬT ĐỔ BÓNG */
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
@@ -77,10 +77,10 @@ function animate() {
     const delta = clock.getDelta();
     player.update(delta);
     interaction.update();
-    if (blockEngine.updateFluids) blockEngine.updateFluids(delta); // TÍNH NĂNG 2: GỌI HÀM NÀY ĐỂ TEXTURE NƯỚC/LAVA TRÔI LIÊN TỤC
-	world.tickFluids(delta); // Nước lan ra từ tâm đặt
-    world.update(delta); // Hạt vỡ, lava nổ lùm bùm, mây trôi
-    world.updateDayNightCycle(delta, scene, camera); // <-- Gọi cập nhật ngày đêm ở World.js
+    world.update(delta);
+    blockEngine.updateFluids(delta);
+    world.tickFluids(delta);
+    world.updateDayNightCycle(delta, scene, camera); 
     renderer.render(scene, camera);
 }
 animate();

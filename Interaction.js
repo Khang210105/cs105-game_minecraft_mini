@@ -1,5 +1,3 @@
-// File này quản lý Raycaster (tia laser phát ra từ camera) để tính toán va chạm và gọi hàm xóa/thêm từ World.
-
 // Interaction.js
 import * as THREE from 'three';
 import { BLOCK_TYPES } from './blocks.js';
@@ -10,12 +8,11 @@ export class Interaction {
         this.world = world;
         this.scene = scene;
         this.raycaster = new THREE.Raycaster();
-        this.mouse = new THREE.Vector2(0, 0); // Tâm màn hình
-        this.limit = 3.6;
+        this.mouse = new THREE.Vector2(0, 0); 
+        this.limit = 4.5; // Kéo dài tầm với ra một chút để dễ đào dưới nước
         this.inventory = inventory;
 
-        // --- Tạo viền khi chọn ô (Highlight) ---
-        const geometry = new THREE.BoxGeometry(1.01, 1.01, 1.01); // Lớn hơn 1 chút để không bị đè hình
+        const geometry = new THREE.BoxGeometry(1.01, 1.01, 1.01); 
         const edges = new THREE.EdgesGeometry(geometry);
         this.selectionBox = new THREE.LineSegments(edges, new THREE.LineBasicMaterial({ color: 0x000000, linewidth: 2 }));
         this.selectionBox.visible = false;
@@ -108,19 +105,35 @@ export class Interaction {
                     if (currentItem && currentItem.isBucket) {
                         if (currentItem.isEmpty && isFluid) {
                             if (targetBlock.userData.isSource) {
-                                this.world.removeBlock(targetBlock)
+                                this.world.clearWaterNetwork(
+                                    targetBlock.userData.gridPos.x, 
+                                    targetBlock.userData.gridPos.y, 
+                                    targetBlock.userData.gridPos.z, 
+                                    targetBlock.userData.type.id
+                                );
                                 const bucketType = targetBlock.userData.type.id === BLOCK_TYPES.LAVA.id ? 
                                                    BLOCK_TYPES.BUCKET_LAVA : BLOCK_TYPES.BUCKET_WATER;
-                                this.inventory.slots[this.inventory.activeSlotIndex] = bucketType;
-                                this.inventory.renderHotbar();
+                                // this.inventory.slots[this.inventory.activeSlotIndex] = bucketType;
+                                // this.inventory.renderHotbar();
                             }
                         } 
                         else if (!currentItem.isEmpty) {
                             let fluidToPour = currentItem.id === BLOCK_TYPES.BUCKET_LAVA.id ? 
                                               BLOCK_TYPES.LAVA : BLOCK_TYPES.WATER;
                             this.world.addBlock(pos.x, pos.y, pos.z, fluidToPour);
-                            this.inventory.slots[this.inventory.activeSlotIndex] = BLOCK_TYPES.BUCKET_EMPTY;
-                            this.inventory.renderHotbar();
+                            // this.inventory.slots[this.inventory.activeSlotIndex] = BLOCK_TYPES.BUCKET_EMPTY;
+                            // this.inventory.renderHotbar();
+                        }
+                        // ĐỔ NƯỚC/LAVA:
+                        else if (!currentItem.isEmpty) {
+                            let fluidToPour = currentItem.id === BLOCK_TYPES.BUCKET_LAVA.id ? 
+                                              BLOCK_TYPES.LAVA : BLOCK_TYPES.WATER;
+                                              
+                            this.world.addBlock(pos.x, pos.y, pos.z, fluidToPour);
+                            
+                            // ĐÃ ĐỔI LẠI: BUCKET_EMPTY
+                            // this.inventory.slots[this.inventory.activeSlotIndex] = BLOCK_TYPES.BUCKET_EMPTY;
+                            // this.inventory.renderHotbar();
                         }
                         return; 
                     }
@@ -136,7 +149,6 @@ export class Interaction {
         
         window.addEventListener('contextmenu', e => e.preventDefault());
     }
-
     update() {
         if (!this.player.controls.isLocked) {
             this.selectionBox.visible = false;
