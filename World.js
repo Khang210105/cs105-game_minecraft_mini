@@ -31,6 +31,8 @@ export class World {
         this.skyColorNight = new THREE.Color(0x0b1026);
         this.timeOfDay = Math.PI / 4;
         this.enableDayNightCycle = true;
+        this.lastScene = null;
+        this.lastCamera = null;
 
         this.initEnvironmentObjects();
         this.createVoxelClouds();
@@ -48,7 +50,8 @@ export class World {
         this.sunLight.shadow.camera.right = 50;
         this.sunLight.shadow.camera.top = 50;
         this.sunLight.shadow.camera.bottom = -50;
-        this.sunLight.shadow.bias = -0.0005;
+        this.sunLight.shadow.bias = -0.00015;
+        this.sunLight.shadow.normalBias = 0.03;
         this.sunLight.target.position.set(0, 0, 0);
         this.engine.scene.add(this.sunLight);
         this.engine.scene.add(this.sunLight.target);
@@ -90,25 +93,68 @@ export class World {
         this.engine.scene.add(this.cloudGroup);
     }
 
-    updateDayNightCycle(delta, scene, camera) {
-        if (!this.enableDayNightCycle) return;
-        this.timeOfDay += delta * 0.03;
+    normalizeTime() {
+        const fullDay = Math.PI * 2;
+        this.timeOfDay = ((this.timeOfDay % fullDay) + fullDay) % fullDay;
+    }
+
+    getTimeHours() {
+        this.normalizeTime();
+        return (((this.timeOfDay + Math.PI / 2) / (Math.PI * 2)) * 24 + 24) % 24;
+    }
+    setTimeHours(hours, scene = this.lastScene, camera = this.lastCamera) {
+        const clampedHours = Math.max(0, Math.min(24, Number(hours) || 0));
+        this.timeOfDay = (clampedHours / 24) * Math.PI * 2 - Math.PI / 2;
+        this.normalizeTime();
+
+        if (scene && camera) {
+            this.applyDayNight(scene, camera);
+        }
+    }
+
+    applyDayNight(scene, camera) {
+        if (!scene || !camera) return;
+
         const radius = 60;
         camera.getWorldPosition(this.cameraWorldPos);
+
         const px = this.cameraWorldPos.x;
         const py = this.cameraWorldPos.y;
         const pz = this.cameraWorldPos.z;
+
         const x = px + radius * Math.cos(this.timeOfDay);
         const y = py + radius * Math.sin(this.timeOfDay);
+
         this.sunLight.position.set(x, y, pz);
         this.sunMesh.position.copy(this.sunLight.position);
+
         this.sunLight.target.position.set(px, py, pz);
         this.sunLight.target.updateMatrixWorld();
+
         const daylight = Math.max(0, Math.min(1, (y - py) / radius + 0.2));
-        scene.background = new THREE.Color().lerpColors(this.skyColorNight, this.skyColorDay, daylight);
+
+        scene.background = new THREE.Color().lerpColors(
+            this.skyColorNight,
+            this.skyColorDay,
+            daylight
+        );
+
         this.sunLight.intensity = 0.15 + daylight * 1.05;
         this.ambientLight.intensity = 0.15 + daylight * 0.3;
+
         this.cameraRef = camera;
+    }
+
+    updateDayNightCycle(delta, scene, camera) {
+        this.lastScene = scene;
+        this.lastCamera = camera;
+
+        if (this.enableDayNightCycle) {
+            this.timeOfDay += delta * 0.03;
+            this.normalizeTime();
+        }
+
+        this.applyDayNight(scene, camera);
     }
 
     getKey(x, y, z) { return `${Math.round(x)},${Math.round(y)},${Math.round(z)}`; }
@@ -130,15 +176,15 @@ export class World {
 
         const existingBlock = this.getBlock(x, y, z);
         if (existingBlock) {
-            if (existingBlock.userData.type.solid) return null; 
-            this.removeBlock(existingBlock); 
+            if (existingBlock.userData.type.solid) return null;
+            this.removeBlock(existingBlock);
         }
 
         const newBlock = this.engine.createBlock(x, y, z, type);
-        newBlock.castShadow = true;
-        newBlock.receiveShadow = true;
+        newBlock.castShadow = y > 0 && !type.isFluid && !type.transparent;
+        newBlock.receiveShadow = !type.isFluid;
         newBlock.userData.gridPos = { x, y, z };
-        
+
         this.blocks.push(newBlock);
         const key = this.getKey(x, y, z);
         this.blockMap.set(key, newBlock);
@@ -147,7 +193,7 @@ export class World {
         if (type.isFluid) {
             newBlock.userData.flowLevel = flowLevel !== null ? flowLevel : type.maxFlow;
             newBlock.userData.isSource = (flowLevel === null) || isSource;
-            
+
             const targetHeight = Math.max(0.1, (newBlock.userData.flowLevel / type.maxFlow) * 0.9);
             newBlock.userData.targetHeight = targetHeight;
 
@@ -176,8 +222,8 @@ export class World {
             if (blockBelow && blockBelow.userData.type.isFluid) {
                 blockBelow.userData.targetHeight = 1.0;
                 blockBelow.scale.set(1, 1.0, 1);
-                blockBelow.position.y = y - 1; 
-                
+                blockBelow.position.y = y - 1;
+
                 // Nếu cục dưới đang nằm trong hàng chờ dâng lên, thì cho nó hoàn thành luôn để khỏi bị lỗi
                 const animIndex = this.animatingFluids.indexOf(blockBelow);
                 if (animIndex > -1) {
@@ -185,7 +231,7 @@ export class World {
                 }
             }
 
-            this.activeFluids.push(newBlock); 
+            this.activeFluids.push(newBlock);
         }
 
         // --- ĐĂNG KÝ VÀO DANH SÁCH LAVA MỖI KHI CÓ LAVA ĐƯỢC TẠO RA ---
@@ -206,7 +252,7 @@ export class World {
         this.fluidTickTimer = 0;
 
         const currentFluids = [...this.activeFluids];
-        this.activeFluids = []; 
+        this.activeFluids = [];
 
         for (let i = 0; i < currentFluids.length; i++) {
             const block = currentFluids[i];
@@ -290,11 +336,11 @@ export class World {
             const blockBelow = this.getBlock(x, y - 1, z);
             if (!blockBelow || !blockBelow.userData.type.solid) {
                 if (!blockBelow || (blockBelow.userData.type.id !== type.id)) {
-                    this.addBlock(x, y - 1, z, type, type.maxFlow, false); 
-                    keepActive = true; 
+                    this.addBlock(x, y - 1, z, type, type.maxFlow, false);
+                    keepActive = true;
                 }
                 this.activeFluids.push(block); // Rơi thì luôn thức để dò đáy
-                continue; 
+                continue;
             }
 
             // 2. CHẢY SANG NGANG NẾU BÊN DƯỚI LÀ MẶT ĐẤT
@@ -328,22 +374,22 @@ export class World {
     updateFluidAnimations(delta) {
         for (let i = this.animatingFluids.length - 1; i >= 0; i--) {
             const block = this.animatingFluids[i];
-            
+
             if (!this.blocks.includes(block)) {
                 this.animatingFluids.splice(i, 1);
                 continue;
             }
-            
+
             const currentHeight = block.scale.y;
             const targetHeight = block.userData.targetHeight;
-            
+
             if (currentHeight < targetHeight) {
-                let newHeight = currentHeight + delta * 4; 
+                let newHeight = currentHeight + delta * 4;
                 if (newHeight >= targetHeight) {
                     newHeight = targetHeight;
-                    this.animatingFluids.splice(i, 1); 
+                    this.animatingFluids.splice(i, 1);
                 }
-                
+
                 block.scale.set(1, newHeight, 1);
                 // Dùng tọa độ chuẩn gridPos.y để không bao giờ bị trôi
                 block.position.y = block.userData.gridPos.y - (1 - newHeight) / 2;
@@ -353,13 +399,13 @@ export class World {
 
     spawnLavaSpark(pos) {
         // Kích thước to hơn chút để trông giống giọt dung nham
-        const size = 0.08 + Math.random() * 0.06; 
+        const size = 0.08 + Math.random() * 0.06;
         const geometry = new THREE.BoxGeometry(size, size, size);
-        
+
         // Chỉ dùng các tông màu rực của dung nham (Cam, Cam Đỏ, Vàng Cam)
         const colors = [0xff4400, 0xff6600, 0xffaa00];
         const color = colors[Math.floor(Math.random() * colors.length)];
-        
+
         const material = new THREE.MeshBasicMaterial({ color: color, transparent: true });
         const particle = new THREE.Mesh(geometry, material);
 
@@ -377,24 +423,24 @@ export class World {
         );
 
         // Thời gian sống cực ngắn (0.3 đến 0.6 giây) để cảm giác nổ chớp nhoáng
-        particle.lifespan = 0.3 + Math.random() * 0.3;     
-        particle.maxLifespan = particle.lifespan;  
-        particle.isSpark = true;     
+        particle.lifespan = 0.3 + Math.random() * 0.3;
+        particle.maxLifespan = particle.lifespan;
+        particle.isSpark = true;
 
-        this.engine.scene.add(particle); 
+        this.engine.scene.add(particle);
         this.particles.push(particle);
     }
 
     updateLavaParticles(deltaTime = 0.016) {
         for (let i = this.lavaParticles.length - 1; i >= 0; i--) {
             let p = this.lavaParticles[i];
-            
+
             // 1. Di chuyển tàn lửa lên trên
             p.position.add(p.userData.velocity);
-            
+
             // 2. Giảm thời gian sống
             p.userData.life -= deltaTime;
-            
+
             // 3. Hiệu ứng mờ dần (Fade out) và thu nhỏ
             p.material.opacity = p.userData.life / p.userData.maxLife;
             const scale = p.userData.life / p.userData.maxLife;
@@ -430,11 +476,11 @@ export class World {
         if (mesh.userData && mesh.userData.gridPos) {
             const { x, y, z } = mesh.userData.gridPos;
             const dirs = [
-                {dx: 1, dy: 0, dz: 0}, {dx: -1, dy: 0, dz: 0},
-                {dx: 0, dy: -1, dz: 0}, {dx: 0, dy: 1, dz: 0},
-                {dx: 0, dy: 0, dz: 1}, {dx: 0, dy: 0, dz: -1}
+                { dx: 1, dy: 0, dz: 0 }, { dx: -1, dy: 0, dz: 0 },
+                { dx: 0, dy: -1, dz: 0 }, { dx: 0, dy: 1, dz: 0 },
+                { dx: 0, dy: 0, dz: 1 }, { dx: 0, dy: 0, dz: -1 }
             ];
-            
+
             for (let dir of dirs) {
                 const neighbor = this.getBlock(x + dir.dx, y + dir.dy, z + dir.dz);
                 if (neighbor && neighbor.userData && neighbor.userData.type && neighbor.userData.type.isFluid) {
@@ -490,8 +536,11 @@ export class World {
             pTexture.colorSpace = THREE.SRGBColorSpace;
             pTexture.magFilter = THREE.NearestFilter;
             pTexture.minFilter = THREE.NearestFilter;
-            const material = new THREE.MeshStandardMaterial({
-                map: pTexture, transparent: true, roughness: 1.0, metalness: 0.0, flatShading: true,
+            const material = new THREE.MeshLambertMaterial({
+                map: pTexture,
+                color: 0xffffff,
+                transparent: true,
+                flatShading: true,
             });
             const p = new THREE.Mesh(this.particleGeometries[Math.floor(Math.random() * 4)], material);
             p.position.set(
@@ -526,7 +575,7 @@ export class World {
                     // [A] DÀNH CHO TÀN LỬA LAVA (Bay lên, mờ dần)
                     p.velocity.y -= 12.0 * delta;
                     p.position.addScaledVector(p.velocity, delta);
-                    
+
                     // Hiệu ứng mờ dần và thu nhỏ
                     const scale = p.lifespan / p.maxLifespan;
                     p.scale.set(scale, scale, scale);
@@ -536,7 +585,7 @@ export class World {
                     // [B] DÀNH CHO MẢNH VỠ BLOCK (Đập đá, đất...)
                     p.velocity.y -= 15.0 * delta; // Trọng lực
                     p.position.addScaledVector(p.velocity, delta);
-                    
+
                     // Xoay mảnh vụn
                     p.rotation.x += p.velocity.x * delta;
                     p.rotation.y += p.velocity.y * delta;
@@ -558,50 +607,50 @@ export class World {
         if (this.activeLavaBlocks.length > 0) {
             // Cộng dồn thời gian mỗi khung hình
             this.lavaPopTimer += delta;
-            
+
             // Cứ đủ 1 giây (1.0) thì cho nổ
             if (this.lavaPopTimer >= 1.0) {
                 // Reset đồng hồ về 0 để đếm lại từ đầu
-                this.lavaPopTimer = 0; 
+                this.lavaPopTimer = 0;
 
                 // Chọn ngẫu nhiên số lượng ô lava sẽ nổ (Ví dụ: 1 đến 3 ô nổ cùng lúc)
                 // Nếu map có quá ít lava (nhỏ hơn 3) thì lấy giới hạn bằng số lượng lava hiện có
                 const numPops = Math.min(this.activeLavaBlocks.length, Math.floor(Math.random() * 3) + 1);
-                
+
                 for (let i = 0; i < numPops; i++) {
                     // Bốc ngẫu nhiên 1 ô lava trong danh sách (kể cả ô gốc lẫn ô chảy lan)
                     const randomIndex = Math.floor(Math.random() * this.activeLavaBlocks.length);
                     const randomLavaBlock = this.activeLavaBlocks[randomIndex];
-                    
+
                     // Gọi hàm bắn bong bóng tại tọa độ của ô đó
                     this.spawnLavaSpark(randomLavaBlock.position);
                 }
             }
         }
     }
-    
+
     clearWaterNetwork(sx, sy, sz, fluidId) {
         sx = Math.round(sx); sy = Math.round(sy); sz = Math.round(sz);
-        
+
         const queue = [{ x: sx, y: sy, z: sz, dist: 0 }];
         const visited = new Set();
         visited.add(`${sx},${sy},${sz}`);
-        
+
         while (queue.length > 0) {
             const { x, y, z, dist } = queue.shift();
             const block = this.getBlock(x, y, z);
-            
+
             if (block && block.userData.type.id === fluidId) {
-                
+
                 // --- CHẶN ĐỨNG SỰ LAN TRÀN (SỬA LỖI ĐỂ LẠI VŨNG NƯỚC) ---
                 // 1. Trục xuất khối nước này khỏi danh sách update để nó không chảy tiếp được nữa
                 const activeIdx = this.activeFluids.indexOf(block);
                 if (activeIdx > -1) {
                     this.activeFluids.splice(activeIdx, 1);
                 }
-                
+
                 // 2. Ép nó thành nước chết
-                block.userData.flowLevel = 0; 
+                block.userData.flowLevel = 0;
                 block.userData.isSource = false;
 
                 // --- SAU ĐÓ MỚI HẸN GIỜ XÓA TỪ TỪ ---
@@ -641,24 +690,24 @@ export class World {
 
                     }, 16);
 
-                }, dist * 180); 
-                
+                }, dist * 180);
+
                 // Quét 6 hướng để lan tỏa hiệu ứng rút nước
                 const directions = [
-                    {dx: 1, dy: 0, dz: 0}, {dx: -1, dy: 0, dz: 0},
-                    {dx: 0, dy: -1, dz: 0}, {dx: 0, dy: 1, dz: 0}, 
-                    {dx: 0, dy: 0, dz: 1}, {dx: 0, dy: 0, dz: -1}
+                    { dx: 1, dy: 0, dz: 0 }, { dx: -1, dy: 0, dz: 0 },
+                    { dx: 0, dy: -1, dz: 0 }, { dx: 0, dy: 1, dz: 0 },
+                    { dx: 0, dy: 0, dz: 1 }, { dx: 0, dy: 0, dz: -1 }
                 ];
-                
+
                 for (let dir of directions) {
                     const nx = x + dir.dx;
                     const ny = y + dir.dy;
                     const nz = z + dir.dz;
                     const key = `${nx},${ny},${nz}`;
-                    
+
                     if (!visited.has(key)) {
                         visited.add(key);
-                        
+
                         const neighbor = this.getBlock(nx, ny, nz);
                         if (neighbor && neighbor.userData.type.id === fluidId) {
                             queue.push({ x: nx, y: ny, z: nz, dist: dist + 1 });

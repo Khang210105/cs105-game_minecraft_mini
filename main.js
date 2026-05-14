@@ -72,6 +72,64 @@ document.addEventListener("keydown", (e) => {
 // --- Đồng hồ hệ thống vật lý ---
 const clock = new THREE.Clock();
 
+const timeSlider = document.getElementById("time-slider");
+const timeLabel = document.getElementById("time-label");
+const dayNightToggle = document.getElementById("day-night-toggle");
+
+let isDraggingTimeSlider = false;
+
+function formatTimeOfDay(hours) {
+    const h = Math.floor(hours) % 24;
+    const m = Math.floor((hours - Math.floor(hours)) * 60);
+
+    return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+}
+
+function syncTimeUiFromWorld() {
+    if (!timeSlider || !timeLabel || isDraggingTimeSlider) return;
+
+    const hours = world.getTimeHours();
+
+    timeSlider.value = hours.toFixed(1);
+    timeLabel.textContent = formatTimeOfDay(hours);
+}
+
+if (timeSlider) {
+    timeSlider.value = world.getTimeHours().toFixed(1);
+
+    timeSlider.addEventListener("pointerdown", () => {
+        isDraggingTimeSlider = true;
+    });
+
+    timeSlider.addEventListener("pointerup", () => {
+        isDraggingTimeSlider = false;
+    });
+
+    timeSlider.addEventListener("input", (e) => {
+        const hours = Number(e.target.value);
+
+        world.enableDayNightCycle = false;
+
+        if (dayNightToggle) {
+            dayNightToggle.checked = false;
+        }
+
+        world.setTimeHours(hours, scene, camera);
+
+        if (timeLabel) {
+            timeLabel.textContent = formatTimeOfDay(hours);
+        }
+    });
+}
+
+if (dayNightToggle) {
+    dayNightToggle.checked = world.enableDayNightCycle;
+
+    dayNightToggle.addEventListener("change", (e) => {
+        world.enableDayNightCycle = e.target.checked;
+    });
+}
+
 function animate() {
     requestAnimationFrame(animate);
     const delta = clock.getDelta();
@@ -80,7 +138,8 @@ function animate() {
     world.update(delta);
     blockEngine.updateFluids(delta);
     world.tickFluids(delta);
-    world.updateDayNightCycle(delta, scene, camera); 
+    world.updateDayNightCycle(delta, scene, camera);
+    syncTimeUiFromWorld();
     renderer.render(scene, camera);
 }
 animate();
@@ -130,6 +189,14 @@ function resetGame() {
     inventory.renderInventoryMenu();
 
     world.generate(25);
+    world.enableDayNightCycle = true;
+    world.setTimeHours(6, scene, camera);
+
+    if (dayNightToggle) {
+        dayNightToggle.checked = true;
+    }
+
+    syncTimeUiFromWorld();
 }
 
 // --- SIMPLIFIED SAVE/LOAD GAME FUNCTIONS ---
@@ -154,7 +221,12 @@ function saveGame(saveName) {
             },
             cameraYaw: camera.rotation.y,
             cameraPitch: camera.rotation.x,
-            
+            dayNight: {
+                timeOfDay: world.timeOfDay,
+                timeHours: world.getTimeHours(),
+                enableDayNightCycle: world.enableDayNightCycle,
+            },
+
             // Quét mảng blocks 1 lần duy nhất và lấy ĐẦY ĐỦ dữ liệu
             blocks: world.blocks.map((block) => {
                 const blockData = {
@@ -168,9 +240,9 @@ function saveGame(saveName) {
                 if (block.userData.type.isFluid) {
                     blockData.flowLevel = block.userData.flowLevel || 0;
                     blockData.isSource = block.userData.isSource || false;
-                    blockData.scaleY = block.scale.y; 
+                    blockData.scaleY = block.scale.y;
                 }
-                
+
                 return blockData;
             }).filter(Boolean) // Loại bỏ các block lỗi (nếu có)
         };
@@ -185,7 +257,7 @@ function saveGame(saveName) {
         a.click();
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
-        
+
         alert(`Game saved as '${saveName}.json'`);
     } catch (error) {
         console.error("Save error:", error);
@@ -215,7 +287,7 @@ function loadGame(fileContent) {
                 world.blocks.forEach((block) => scene.remove(block));
                 world.blocks = [];
                 world.blockMap.clear();
-                
+
                 // MỚI: Dọn dẹp luôn các mảng chất lỏng để tránh lỗi bóng ma
                 world.activeFluids = [];
                 world.animatingFluids = [];
@@ -243,7 +315,7 @@ function loadGame(fileContent) {
                         if (blockType.isFluid && block) {
                             block.scale.y = blockData.scaleY || 1.0;
                             block.position.y = blockData.y - (1 - block.scale.y) / 2;
-                            
+
                             // Xóa block này khỏi danh sách đang "dâng lên" vì nó đã ở đúng vị trí
                             const animIndex = world.animatingFluids.indexOf(block);
                             if (animIndex > -1) world.animatingFluids.splice(animIndex, 1);
@@ -270,6 +342,24 @@ function loadGame(fileContent) {
                     camera.rotation.x = saveData.cameraPitch || 0;
                     camera.rotation.z = 0;
                 }
+                if (saveData.dayNight) {
+                    if (saveData.dayNight.timeOfDay !== undefined) {
+                        world.timeOfDay = saveData.dayNight.timeOfDay;
+                    } else if (saveData.dayNight.timeHours !== undefined) {
+                        world.setTimeHours(saveData.dayNight.timeHours, scene, camera);
+                    }
+
+                    if (saveData.dayNight.enableDayNightCycle !== undefined) {
+                        world.enableDayNightCycle = saveData.dayNight.enableDayNightCycle;
+                    }
+
+                    if (dayNightToggle) {
+                        dayNightToggle.checked = world.enableDayNightCycle;
+                    }
+
+                    world.updateDayNightCycle(0, scene, camera);
+                    syncTimeUiFromWorld();
+                }
 
                 // Reset player movement state to prevent drifting
                 player.velocity.set(0, 0, 0);
@@ -279,12 +369,12 @@ function loadGame(fileContent) {
                 // Lock controls and finish
                 if (typeof state !== 'undefined') state = "going";
                 player.controls.lock();
-                
+
                 if (typeof hideLoadingIndicator === "function") hideLoadingIndicator();
                 document.getElementById("load-dialog").style.display = "none";
                 const instructions = document.getElementById("instructions");
                 if (instructions) instructions.style.display = "none";
-                
+
                 document.getElementById("load-file-status").textContent = "Game loaded!";
             } catch (error) {
                 console.error("Load error:", error);
@@ -302,26 +392,26 @@ function loadGame(fileContent) {
 
 // Step 3: Handle file selection
 function setupFileLoadListener() {
-	const fileInput = document.getElementById("load-file-input");
-	fileInput.addEventListener("change", (e) => {
-		const file = e.target.files[0];
-		if (!file) return;
+    const fileInput = document.getElementById("load-file-input");
+    fileInput.addEventListener("change", (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
 
-		const reader = new FileReader();
-		reader.onload = (event) => {
-			try {
-				const content = event.target.result;
-				loadGame(content);
-			} catch (error) {
-				console.error("FileReader error:", error);
-				alert("Error reading file: " + error.message);
-			}
-		};
-		reader.onerror = () => {
-			alert("Error reading file");
-		};
-		reader.readAsText(file);
-	});
+        const reader = new FileReader();
+        reader.onload = (event) => {
+            try {
+                const content = event.target.result;
+                loadGame(content);
+            } catch (error) {
+                console.error("FileReader error:", error);
+                alert("Error reading file: " + error.message);
+            }
+        };
+        reader.onerror = () => {
+            alert("Error reading file");
+        };
+        reader.readAsText(file);
+    });
 }
 
 // Initialize file listener
@@ -329,57 +419,57 @@ setupFileLoadListener();
 
 // Save game button
 document.getElementById("save-game-btn").addEventListener("click", () => {
-	document.getElementById("save-dialog").style.display = "block";
-	document.getElementById("save-name-input").value = "";
-	document.getElementById("save-name-input").focus();
+    document.getElementById("save-dialog").style.display = "block";
+    document.getElementById("save-name-input").value = "";
+    document.getElementById("save-name-input").focus();
 });
 
 // Enter key support for save name input
 document.getElementById("save-name-input").addEventListener("keypress", (e) => {
-	if (e.key === "Enter") {
-		const saveName = document.getElementById("save-name-input").value;
-		saveGame(saveName);
-		document.getElementById("save-dialog").style.display = "none";
-	}
+    if (e.key === "Enter") {
+        const saveName = document.getElementById("save-name-input").value;
+        saveGame(saveName);
+        document.getElementById("save-dialog").style.display = "none";
+    }
 });
 
 // Save confirm button
 document.getElementById("save-confirm-btn").addEventListener("click", () => {
-	const saveName = document.getElementById("save-name-input").value;
-	saveGame(saveName);
-	document.getElementById("save-dialog").style.display = "none";
+    const saveName = document.getElementById("save-name-input").value;
+    saveGame(saveName);
+    document.getElementById("save-dialog").style.display = "none";
 });
 
 // Save cancel button
 document.getElementById("save-cancel-btn").addEventListener("click", () => {
-	document.getElementById("save-dialog").style.display = "none";
+    document.getElementById("save-dialog").style.display = "none";
 });
 
 // Load game button
 document.getElementById("load-game-btn").addEventListener("click", () => {
-	document.getElementById("load-dialog").style.display = "block";
-	document.getElementById("load-file-status").textContent =
-		"Select a .json save file";
-	document.getElementById("load-file-input").value = "";
+    document.getElementById("load-dialog").style.display = "block";
+    document.getElementById("load-file-status").textContent =
+        "Select a .json save file";
+    document.getElementById("load-file-input").value = "";
 });
 
 // Load file button - trigger file input
 document.getElementById("load-file-btn").addEventListener("click", () => {
-	document.getElementById("load-file-input").click();
+    document.getElementById("load-file-input").click();
 });
 
 // Load cancel button
 document.getElementById("load-cancel-btn").addEventListener("click", () => {
-	document.getElementById("load-dialog").style.display = "none";
+    document.getElementById("load-dialog").style.display = "none";
 });
 
 // Gắn nút "New Game" với hàm reset
 newGameButton.addEventListener("click", () => {
-	showLoadingIndicator();
-	setTimeout(() => {
-		resetGame();
-		state = "going";
-		player.controls.lock();
-		hideLoadingIndicator();
-	}, 1000);
+    showLoadingIndicator();
+    setTimeout(() => {
+        resetGame();
+        state = "going";
+        player.controls.lock();
+        hideLoadingIndicator();
+    }, 1000);
 });

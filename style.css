@@ -11,7 +11,8 @@ body {
 	width: 20px;
 	height: 20px;
 	border: 2px solid rgba(255, 255, 255, 0.8);
-	border-radius: 50%; /* Tâm hình tròn cho hiện đại */
+	border-radius: 50%;
+	/* Tâm hình tròn cho hiện đại */
 	transform: translate(-50%, -50%);
 	pointer-events: none;
 	z-index: 10;
@@ -58,7 +59,8 @@ body {
 }
 
 .hotbar-slot.active {
-	border-color: white; /* Viền trắng khi đang chọn */
+	border-color: white;
+	/* Viền trắng khi đang chọn */
 	box-shadow: 0 0 10px white;
 }
 
@@ -106,6 +108,7 @@ body {
 	0% {
 		transform: rotate(0deg);
 	}
+
 	100% {
 		transform: rotate(360deg);
 	}
@@ -295,7 +298,8 @@ body {
 
 #inventory-grid {
 	display: grid;
-	grid-template-columns: repeat(5, 1fr); /* 5 cột */
+	grid-template-columns: repeat(5, 1fr);
+	/* 5 cột */
 	gap: 15px;
 	margin-top: 20px;
 }
@@ -312,6 +316,34 @@ body {
 }
 
 .inv-item:hover {
-	border-color: yellow; /* Sáng lên khi chỉ chuột vào */
+	border-color: yellow;
+	/* Sáng lên khi chỉ chuột vào */
 	transform: scale(1.1);
+}
+
+#time-control-panel {
+	position: fixed;
+	top: 12px;
+	left: 12px;
+	z-index: 100;
+	width: 230px;
+	padding: 8px 10px;
+	border: 2px solid rgba(255, 255, 255, 0.55);
+	border-radius: 8px;
+	background: rgba(0, 0, 0, 0.55);
+	color: white;
+	font-family: monospace;
+	font-size: 13px;
+	user-select: none;
+}
+
+#time-control-panel input[type="range"] {
+	width: 100%;
+	margin: 6px 0;
+}
+
+#cycle-toggle-label {
+	display: flex;
+	align-items: center;
+	gap: 6px;
 }
