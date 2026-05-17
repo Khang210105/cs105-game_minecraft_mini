@@ -133,17 +133,38 @@ if (dayNightToggle) {
 // Light toggles
 const sunLightToggle = document.getElementById("sun-light-toggle");
 const ambientLightToggle = document.getElementById("ambient-light-toggle");
+const moonLightToggle = document.getElementById("moon-light-toggle");
+const lavaLightToggle = document.getElementById("lava-light-toggle");
 
 if (sunLightToggle) {
+	sunLightToggle.checked = world.enableSunLight;
 	sunLightToggle.addEventListener("change", (e) => {
-		world.sunLight.visible = e.target.checked;
-		world.sunMesh.visible = e.target.checked;
+		world.enableSunLight = e.target.checked;
+		world.applyDayNight(scene, camera);
 	});
 }
 
 if (ambientLightToggle) {
+	ambientLightToggle.checked = world.enableAmbientLight;
 	ambientLightToggle.addEventListener("change", (e) => {
-		world.ambientLight.visible = e.target.checked;
+		world.enableAmbientLight = e.target.checked;
+		world.applyDayNight(scene, camera);
+	});
+}
+
+if (moonLightToggle) {
+	moonLightToggle.checked = world.enableMoonLight;
+	moonLightToggle.addEventListener("change", (e) => {
+		world.enableMoonLight = e.target.checked;
+		world.applyDayNight(scene, camera);
+	});
+}
+
+if (lavaLightToggle) {
+	lavaLightToggle.checked = world.enableLavaLights;
+	lavaLightToggle.addEventListener("change", (e) => {
+		world.enableLavaLights = e.target.checked;
+		world.updateLocalLights();
 	});
 }
 

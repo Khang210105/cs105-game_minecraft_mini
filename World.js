@@ -40,6 +40,10 @@ export class World {
 		this.localLightShadowCount = 2;
 		this.localLightPool = [];
 		this.lightQueryPos = new THREE.Vector3();
+		this.enableSunLight = false;
+		this.enableAmbientLight = true;
+		this.enableMoonLight = false;
+		this.enableLavaLights = false;
 
 		this.initEnvironmentObjects();
 		this.createVoxelClouds();
@@ -195,6 +199,9 @@ export class World {
 
 		this.sunLight.intensity = 0.15 + daylight * 1.05;
 		this.ambientLight.intensity = 0.15 + daylight * 0.3;
+		this.sunLight.visible = this.enableSunLight;
+		this.sunMesh.visible = this.enableSunLight;
+		this.ambientLight.visible = this.enableAmbientLight;
 
 		const moonX = px - radius * Math.cos(this.timeOfDay);
 		const moonY = py - radius * Math.sin(this.timeOfDay);
@@ -203,7 +210,7 @@ export class World {
 		this.moonLight.target.position.set(px, py, pz);
 		this.moonLight.target.updateMatrixWorld();
 		this.moonLight.intensity = 0.05 + nightFactor * 0.45;
-		this.moonLight.visible = nightFactor > 0.02;
+		this.moonLight.visible = this.enableMoonLight && nightFactor > 0.02;
 		this.moonMesh.visible = this.moonLight.visible;
 
 		this.cameraRef = camera;
@@ -734,6 +741,12 @@ export class World {
 
 	updateLocalLights() {
 		if (!this.localLightPool || this.localLightPool.length === 0) return;
+		if (!this.enableLavaLights) {
+			this.localLightPool.forEach((light) => {
+				light.visible = false;
+			});
+			return;
+		}
 
 		const focus =
 			this.player && this.player.camera ? this.player.camera.position : null;
