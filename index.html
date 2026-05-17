@@ -1,66 +1,91 @@
 <!doctype html>
 <html lang="vi">
+	<head>
+		<meta charset="UTF-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+		<title>Mini Minecraft Three.js</title>
+		<link rel="stylesheet" href="style.css" />
+	</head>
 
-<head>
-	<meta charset="UTF-8" />
-	<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-	<title>Mini Minecraft Three.js</title>
-	<link rel="stylesheet" href="style.css" />
-</head>
-
-<body>
-	<div id="crosshair"></div>
-	<div id="instructions">
-		<h2>Mini Minecraft</h2>
-		<p>WASD: Di chuyển | Space: Nhảy</p>
-		<p>Chuột trái: Đập | Chuột phải: Đặt</p>
-		<button id="continue-game-btn" style="display: none">Continue</button>
-		<button id="new-game-btn">New Game</button>
-		<button id="save-game-btn" style="display: none">Save Game</button>
-		<button id="load-game-btn">Load Game</button>
-	</div>
-
-	<div id="time-control-panel">
-		<label for="time-slider">Thời gian: <span id="time-label">06:00</span></label>
-		<input id="time-slider" type="range" min="0" max="24" step="0.1" value="6" />
-
-		<label id="cycle-toggle-label">
-			<input id="day-night-toggle" type="checkbox" checked />
-			Tự chạy ngày/đêm
-		</label>
-	</div>
-	<div id="hotbar"></div>
-
-	<div id="inventory-menu" style="display: none">
-		<h2>Kho đồ</h2>
-		<div id="inventory-grid"></div>
-	</div>
-
-	<div id="loading-overlay" style="display: none">
-		<div id="loading-spinner"></div>
-		<p id="loading-text">Loading...</p>
-	</div>
-
-	<div id="save-dialog" style="display: none">
-		<h2>Save Game</h2>
-		<input type="text" id="save-name-input" placeholder="Enter save name..." />
-		<div id="save-dialog-buttons">
-			<button id="save-confirm-btn">Save</button>
-			<button id="save-cancel-btn">Cancel</button>
+	<body>
+		<div id="crosshair"></div>
+		<div id="instructions">
+			<h2>Mini Minecraft</h2>
+			<p>WASD: Move | Space: Jump</p>
+			<p>Left Click: Break | Right Click: Place</p>
+			<button id="continue-game-btn" style="display: none">Continue</button>
+			<button id="new-game-btn">New Game</button>
+			<button id="save-game-btn" style="display: none">Save Game</button>
+			<button id="load-game-btn">Load Game</button>
 		</div>
-	</div>
 
-	<div id="load-dialog" style="display: none">
-		<h2>Load Game</h2>
-		<input type="file" id="load-file-input" accept=".json" style="display: none" />
-		<button id="load-file-btn">Choose Save File</button>
-		<p id="load-file-status" style="margin-top: 15px; color: #aaa"></p>
-		<div id="load-dialog-buttons">
-			<button id="load-cancel-btn">Cancel</button>
+		<div id="time-control-panel">
+			<label for="time-slider">Time: <span id="time-label">06:00</span></label>
+			<input
+				id="time-slider"
+				type="range"
+				min="0"
+				max="24"
+				step="0.1"
+				value="6"
+			/>
+
+			<label id="cycle-toggle-label">
+				<input id="day-night-toggle" type="checkbox" checked />
+				Auto Cycle Day/Night
+			</label>
+
+			<label id="sun-light-toggle-label">
+				<input id="sun-light-toggle" type="checkbox" checked />
+				Sun Light
+			</label>
+
+			<label id="ambient-light-toggle-label">
+				<input id="ambient-light-toggle" type="checkbox" checked />
+				Ambient Light
+			</label>
 		</div>
-	</div>
+		<div id="hotbar"></div>
 
-	<script type="importmap">
+		<div id="inventory-menu" style="display: none">
+			<h2>Kho đồ</h2>
+			<div id="inventory-grid"></div>
+		</div>
+
+		<div id="loading-overlay" style="display: none">
+			<div id="loading-spinner"></div>
+			<p id="loading-text">Loading...</p>
+		</div>
+
+		<div id="save-dialog" style="display: none">
+			<h2>Save Game</h2>
+			<input
+				type="text"
+				id="save-name-input"
+				placeholder="Enter save name..."
+			/>
+			<div id="save-dialog-buttons">
+				<button id="save-confirm-btn">Save</button>
+				<button id="save-cancel-btn">Cancel</button>
+			</div>
+		</div>
+
+		<div id="load-dialog" style="display: none">
+			<h2>Load Game</h2>
+			<input
+				type="file"
+				id="load-file-input"
+				accept=".json"
+				style="display: none"
+			/>
+			<button id="load-file-btn">Choose Save File</button>
+			<p id="load-file-status" style="margin-top: 15px; color: #aaa"></p>
+			<div id="load-dialog-buttons">
+				<button id="load-cancel-btn">Cancel</button>
+			</div>
+		</div>
+
+		<script type="importmap">
 			{
 				"imports": {
 					"three": "https://unpkg.com/three@0.160.0/build/three.module.js",
@@ -69,7 +94,6 @@
 			}
 		</script>
 
-	<script type="module" src="main.js"></script>
-</body>
-
+		<script type="module" src="main.js"></script>
+	</body>
 </html>
