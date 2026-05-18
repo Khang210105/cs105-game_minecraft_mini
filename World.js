@@ -45,6 +45,32 @@ export class World {
 		this.enableMoonLight = false;
 		this.enableLavaLights = false;
 
+		// Fire animation storage
+		this.fireParticles = [];
+		this.fireTickTimer = 0;
+		this.fireEffects = [];
+		this.fireTexture = new THREE.TextureLoader().load("./textures/blocks/fire_1.png");
+
+		this.fireTexture.magFilter = THREE.NearestFilter;
+		this.fireTexture.minFilter = THREE.NearestFilter;
+		this.fireTexture.wrapS = THREE.RepeatWrapping;
+		this.fireTexture.wrapT = THREE.RepeatWrapping;
+		const frames = 16;
+		this.fireTexture.repeat.set(1, 1 / frames);
+		this.fireAnimationData = {
+			frames,
+			frameRatio: 1 / frames,
+			fps: 8
+		};
+		this.fireAnimationTime = 0;
+		this.fireMaterial = new THREE.MeshBasicMaterial({
+			map: this.fireTexture,
+			transparent: true,
+			alphaTest: 0.1,
+			side: THREE.DoubleSide,
+			depthWrite: false
+		});
+
 		this.initEnvironmentObjects();
 		this.createVoxelClouds();
 	}
@@ -235,11 +261,50 @@ export class World {
 		return this.blockMap.get(this.getKey(x, y, z));
 	}
 
-	generate(size = 50) {
+	generate(size = 100) {
+
 		const half = Math.floor(size / 2);
+
+		const scale = 0.08;
+
+		const maxHeight = 12;
+
 		for (let x = -half; x < half; x++) {
+
 			for (let z = -half; z < half; z++) {
-				this.addBlock(x, 0, z, BLOCK_TYPES.GRASS);
+
+				// Fake terrain noise
+				const noise =
+					Math.sin(x * scale) * 0.5 +
+					Math.cos(z * scale * 0.8) * 0.5 +
+					Math.sin((x + z) * scale * 0.3);
+
+				const normalized =
+					(noise + 2) / 4;
+
+				const height =
+					Math.floor(normalized * maxHeight);
+
+				// Terrain
+				for (let y = -5; y <= height; y++) {
+
+					let blockType;
+
+					if (y === height) {
+
+						blockType = BLOCK_TYPES.GRASS;
+
+					} else if (y > height - 3) {
+
+						blockType = BLOCK_TYPES.DIRT;
+
+					} else {
+
+						blockType = BLOCK_TYPES.STONE;
+					}
+
+					this.addBlock(x, y, z, blockType);
+				}
 			}
 		}
 	}
@@ -401,7 +466,7 @@ export class World {
 
 			// 1. ƯU TIÊN CHẢY XUỐNG DƯỚI
 			const blockBelow = this.getBlock(x, y - 1, z);
-			if (!blockBelow || !blockBelow.userData.type.solid) {
+			if (!blockBelow || (!blockBelow.userData.type.solid && !blockBelow.userData.type.isFluid)) {
 				if (!blockBelow || blockBelow.userData.type.id !== type.id) {
 					this.addBlock(x, y - 1, z, type, type.maxFlow, false);
 					keepActive = true;
@@ -503,6 +568,106 @@ export class World {
 		this.particles.push(particle);
 	}
 
+	spawnFireParticle(pos) {
+
+		const size = 0.08 + Math.random() * 0.08;
+
+		const geometry =
+			new THREE.BoxGeometry(size, size, size);
+
+		const colors = [
+			0xff6600,
+			0xffaa00,
+			0xff3300
+		];
+
+		const material = new THREE.MeshBasicMaterial({
+			color: colors[Math.floor(Math.random() * colors.length)],
+			transparent: true,
+			opacity: 1
+		});
+
+		const p = new THREE.Mesh(geometry, material);
+
+		p.position.set(
+			pos.x + (Math.random() - 0.5) * 0.7,
+			pos.y + Math.random() * 0.8,
+			pos.z + (Math.random() - 0.5) * 0.7
+		);
+
+		p.velocity = new THREE.Vector3(
+			(Math.random() - 0.5) * 0.2,
+			Math.random() * 0.8 + 0.4,
+			(Math.random() - 0.5) * 0.2
+		);
+
+		p.lifespan = 0.5 + Math.random() * 0.5;
+		p.maxLifespan = p.lifespan;
+
+		this.engine.scene.add(p);
+		this.fireParticles.push(p);
+	}
+
+	addFireOverlay(block, faceNormal) {
+
+		if (!block.userData.fireOverlays) {
+			block.userData.fireOverlays = [];
+		}
+
+		const alreadyExists =
+			block.userData.fireOverlays.some(f => {
+
+				const n = f.userData.faceNormal;
+
+				return (
+					n.x === faceNormal.x &&
+					n.y === faceNormal.y &&
+					n.z === faceNormal.z
+				);
+			});
+
+		if (alreadyExists) return;
+
+		const geometry =
+			new THREE.PlaneGeometry(1.02, 1.02);
+
+		const material =
+			this.fireMaterial.clone();
+
+		material.map =
+			this.fireTexture.clone();
+
+		material.map.needsUpdate = true;
+
+		const fire =
+			new THREE.Mesh(geometry, material);
+
+		fire.position.copy(block.position);
+
+		fire.position.add(
+			faceNormal.clone().multiplyScalar(0.53)
+		);
+
+		if (Math.abs(faceNormal.x) > 0) {
+			fire.rotation.y = Math.PI / 2;
+		}
+
+		if (Math.abs(faceNormal.y) > 0) {
+			fire.rotation.x = Math.PI / 2;
+		}
+
+		fire.userData.parentBlock = block;
+
+		fire.userData.faceNormal =
+			faceNormal.clone();
+
+		this.engine.scene.add(fire);
+
+		this.fireEffects.push(fire);
+
+		block.userData.fireOverlays.push(fire);
+	}
+
 	updateLavaParticles(deltaTime = 0.016) {
 		for (let i = this.lavaParticles.length - 1; i >= 0; i--) {
 			let p = this.lavaParticles[i];
@@ -539,6 +704,24 @@ export class World {
 		const z = mesh.userData.gridPos
 			? mesh.userData.gridPos.z
 			: Math.round(mesh.position.z);
+		// fire animation
+		if (mesh.userData.fireOverlays) {
+
+			for (const fire of mesh.userData.fireOverlays) {
+
+				this.engine.scene.remove(fire);
+
+				fire.geometry.dispose();
+				fire.material.dispose();
+
+				const index =
+					this.fireEffects.indexOf(fire);
+
+				if (index !== -1) {
+					this.fireEffects.splice(index, 1);
+				}
+			}
+		}
 		this.engine.scene.remove(mesh);
 		this.blocks = this.blocks.filter((b) => b !== mesh);
 		this.blockMap.delete(this.getKey(x, y, z));
@@ -737,6 +920,100 @@ export class World {
 		}
 
 		this.updateLocalLights();
+		for (let i = this.fireParticles.length - 1; i >= 0; i--) {
+
+			const p = this.fireParticles[i];
+
+			p.lifespan -= delta;
+
+			if (p.lifespan <= 0) {
+
+				this.engine.scene.remove(p);
+
+				p.geometry.dispose();
+				p.material.dispose();
+
+				this.fireParticles.splice(i, 1);
+
+			} else {
+
+				p.position.addScaledVector(p.velocity, delta);
+
+				const alpha = p.lifespan / p.maxLifespan;
+
+				p.material.opacity = alpha;
+
+				p.scale.set(alpha, alpha, alpha);
+			}
+		}
+		this.fireTickTimer += delta;
+
+		if (this.fireTickTimer >= 0.5) {
+
+			this.fireTickTimer = 0;
+
+			const directions = [
+				{ dx: 1, dy: 0, dz: 0 },
+				{ dx: -1, dy: 0, dz: 0 },
+				{ dx: 0, dy: 1, dz: 0 },
+				{ dx: 0, dy: -1, dz: 0 },
+				{ dx: 0, dy: 0, dz: 1 },
+				{ dx: 0, dy: 0, dz: -1 },
+			];
+
+			for (const lava of this.activeLavaBlocks) {
+
+				const { x, y, z } = lava.userData.gridPos;
+
+				for (const dir of directions) {
+
+					const neighbor = this.getBlock(
+						x + dir.dx,
+						y + dir.dy,
+						z + dir.dz
+					);
+
+					if (
+						neighbor &&
+						neighbor.userData.type.id === BLOCK_TYPES.WOOD.id
+					) {
+						this.addFireOverlay(
+							neighbor,
+							new THREE.Vector3(
+								-dir.dx,
+								-dir.dy,
+								-dir.dz
+							)
+						);
+						// Spawn lửa
+						this.spawnFireParticle(neighbor.position);
+
+						// Tỉ lệ cháy
+						if (Math.random() < 0.15) {
+
+							this.removeBlock(neighbor);
+						}
+					}
+				}
+			}
+		}
+		this.fireAnimationTime += delta;
+
+		const frame =
+			Math.floor(
+				this.fireAnimationTime *
+				this.fireAnimationData.fps
+			) % this.fireAnimationData.frames;
+
+		const offsetY =
+			1 -
+			this.fireAnimationData.frameRatio *
+			(frame + 1);
+
+		for (const fire of this.fireEffects) {
+
+			fire.material.map.offset.y = offsetY;
+		}
 	}
 
 	updateLocalLights() {

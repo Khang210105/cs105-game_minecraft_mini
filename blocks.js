@@ -71,5 +71,18 @@ export const BLOCK_TYPES = {
         transparent: true, solid: false,
         isBucket: true, isEmpty: false,
         placesBlock: 'LAVA'
+    },
+    WOOD: {
+        id: 14,
+        name: "Wood",
+        solid: true,
+        textures: [
+            "./textures/blocks/log_oak.png",
+            "./textures/blocks/log_oak.png",
+            "./textures/blocks/log_oak_top.png",
+            "./textures/blocks/log_oak_top.png",
+            "./textures/blocks/log_oak.png",
+            "./textures/blocks/log_oak.png",
+        ]
     }
 };
