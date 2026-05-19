@@ -251,8 +251,11 @@ export class Player {
 
 		// Chống rơi ra ngoài map vĩnh viễn (respawn)
 		if (nextPos.y < -20) {
-			nextPos.set(0, 10, 0);
-			this.velocity.y = 0;
+			const spawn = this.world.findSafeSpawnPosition(0, 0);
+
+			nextPos.set(spawn.x, spawn.y, spawn.z);
+			this.velocity.set(0, 0, 0);
+			this.canJump = false;
 		}
 
 		this.position.copy(nextPos);

@@ -369,3 +369,20 @@ body {
 	align-items: center;
 	gap: 6px;
 }
+
+#fps-counter {
+	position: fixed;
+	top: 10px;
+	right: 10px;
+	z-index: 9999;
+
+	color: #fff;
+	font-family: monospace;
+	font-size: 14px;
+	background: rgba(0, 0, 0, 0.45);
+	padding: 6px 8px;
+	border-radius: 6px;
+
+	pointer-events: none;
+	user-select: none;
+}

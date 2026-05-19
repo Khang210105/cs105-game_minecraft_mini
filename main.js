@@ -6,6 +6,7 @@ import { Player } from "./Player.js";
 import { Interaction } from "./Interaction.js";
 import { Inventory } from "./Inventory.js";
 import { BLOCK_TYPES } from "./blocks.js";
+import { genMap } from "./map.js";
 
 const scene = new THREE.Scene();
 
@@ -24,12 +25,31 @@ renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
 // --- Khởi tạo ---
+
 const blockEngine = new BlockEngine(scene);
 const world = new World(blockEngine);
-world.generate(25);
+const gen = new genMap({
+	mapSize: 20,
+	chunkSize: 10,
+	columnHeight: 5,
+	preset: "mixed",     // "plains" | "hills" | "mountains" | "mixed"
+	seed: Date.now(),    // đổi seed mỗi lần chạy cho “ngẫu nhiên”
+});
 
+gen.generate(world);
+
+// Tạo player TRƯỚC
 const player = new Player(camera, document.body, world);
-world.player = player; // TÍNH NĂNG 1: THÊM DÒNG NÀY ĐỂ MÂY VÀ MẶT TRỜI BÁM THEO BẠN
+world.player = player;
+
+// Sau đó mới tìm spawn và set vị trí
+const spawn = world.findSafeSpawnPosition(0, 0);
+player.position.set(spawn.x, spawn.y, spawn.z);
+
+// Sync camera theo player ngay lập tức
+camera.position.copy(player.position);
+camera.position.y += player.eyeLevel;
+
 const inventory = new Inventory();
 const interaction = new Interaction(player, world, scene, inventory);
 
@@ -37,7 +57,8 @@ const interaction = new Interaction(player, world, scene, inventory);
 const instructions = document.getElementById("instructions");
 const newGameButton = document.getElementById("new-game-btn");
 const continueGameButton = document.getElementById("continue-game-btn");
-let state = console.log(performance.getEntriesByType("navigation")[0].type);
+let state = performance.getEntriesByType("navigation")[0].type;
+console.log(state);
 // Click để khóa chuột vào game (trừ khi đang mở túi đồ)
 continueGameButton.addEventListener("click", (e) => {
 	player.controls.lock();
@@ -69,8 +90,20 @@ document.addEventListener("keydown", (e) => {
 	}
 });
 
+const rainToggle = document.getElementById("rain-toggle");
+if (rainToggle) {
+	rainToggle.checked = world.enableRain;
+	rainToggle.addEventListener("change", (e) => {
+		world.setRainEnabled(e.target.checked);
+	});
+}
+
 // --- Đồng hồ hệ thống vật lý ---
 const clock = new THREE.Clock();
+const fpsEl = document.getElementById("fps-counter");
+let fpsAcc = 0;
+let fpsFrames = 0;
+let fpsTimer = 0;
 
 const timeSlider = document.getElementById("time-slider");
 const timeLabel = document.getElementById("time-label");
@@ -171,6 +204,15 @@ if (lavaLightToggle) {
 function animate() {
 	requestAnimationFrame(animate);
 	const delta = clock.getDelta();
+	// FPS (cập nhật khoảng 4 lần/giây cho đỡ giật chữ)
+	fpsTimer += delta;
+	fpsFrames++;
+	if (fpsTimer >= 0.25) {
+		const fps = fpsFrames / fpsTimer;
+		if (fpsEl) fpsEl.textContent = `FPS: ${fps.toFixed(0)}`;
+		fpsTimer = 0;
+		fpsFrames = 0;
+	}
 	player.update(delta);
 	interaction.update();
 	world.update(delta);
@@ -198,27 +240,47 @@ function hideLoadingIndicator() {
 
 // --- Hàm Reset Game ---
 function resetGame() {
+	// --- XÓA BLOCKS HIỆN TẠI ---
 	world.blocks.forEach((block) => scene.remove(block));
 	world.blocks = [];
 	world.blockMap.clear();
 
+	// Reset state fluid để khỏi “lan bóng ma”
+	world.activeFluids = [];
+	world.animatingFluids = [];
+	world.activeLavaBlocks = [];
+	world.lavaPopTimer = 0;
+	world.fluidTickTimer = 0;
+
+	// --- XÓA PARTICLES (đập block / lava spark) ---
 	world.particles.forEach((particle) => {
 		scene.remove(particle);
 	});
 	world.particles = [];
 
-	player.position.set(0, 1, 0);
+	// --- XÓA FIRE EFFECTS/OVERLAYS nếu có ---
+	// (World.js của bạn có fireEffects + fireParticles)
+	if (world.fireEffects && Array.isArray(world.fireEffects)) {
+		world.fireEffects.forEach((fire) => scene.remove(fire));
+		world.fireEffects = [];
+	}
+	if (world.fireParticles && Array.isArray(world.fireParticles)) {
+		world.fireParticles.forEach((p) => scene.remove(p));
+		world.fireParticles = [];
+	}
+	if (world.fireTickTimer !== undefined) world.fireTickTimer = 0;
+
+	// --- RESET TRẠNG THÁI NGƯỜI CHƠI ---
 	player.velocity.set(0, 0, 0);
 	player.canJump = false;
 	player.keys = { w: false, a: false, s: false, d: false };
 
-	camera.position.copy(player.position);
-	camera.position.y += player.eyeLevel;
 	camera.rotation.order = "YXZ";
 	camera.rotation.y = 0;
 	camera.rotation.x = 0;
 	camera.rotation.z = 0;
 
+	// --- RESET INVENTORY UI ---
 	inventory.slots.fill(null);
 	inventory.initDefaultItems();
 	inventory.activeSlotIndex = 0;
@@ -226,7 +288,25 @@ function resetGame() {
 	inventory.renderHotbar();
 	inventory.renderInventoryMenu();
 
-	world.generate(25);
+	// --- SINH LẠI MAP BẰNG CHUNK GENERATOR (map.js) ---
+	const gen = new genMap({
+		mapSize: 20,
+		chunkSize: 10,
+		columnHeight: 5,
+		preset: "mixed", // "plains" | "hills" | "mountains" | "mixed"
+		seed: Date.now(),
+	});
+	gen.generate(world);
+
+	// --- SPAWN AN TOÀN SAU KHI GENERATE ---
+	const spawn = world.findSafeSpawnPosition(0, 0);
+	player.position.set(spawn.x, spawn.y, spawn.z);
+
+	// Sync camera theo player
+	camera.position.copy(player.position);
+	camera.position.y += player.eyeLevel;
+
+	// --- RESET DAY/NIGHT ---
 	world.enableDayNightCycle = true;
 	world.setTimeHours(6, scene, camera);
 
@@ -414,13 +494,21 @@ function loadGame(fileContent) {
 				player.canJump = false;
 
 				// Lock controls and finish
+				// if (typeof state !== "undefined") state = "going";
+				// player.controls.lock();
+
+				// Finish: yêu cầu người chơi click để lock (browser policy)
 				if (typeof state !== "undefined") state = "going";
-				player.controls.lock();
 
 				if (typeof hideLoadingIndicator === "function") hideLoadingIndicator();
 				document.getElementById("load-dialog").style.display = "none";
+
 				const instructions = document.getElementById("instructions");
-				if (instructions) instructions.style.display = "none";
+				if (instructions) instructions.style.display = "block";
+
+				// Bắt người chơi bấm Continue để vào game (user gesture)
+				continueGameButton.style.display = "block";
+				document.getElementById("save-game-btn").style.display = "block";
 
 				document.getElementById("load-file-status").textContent =
 					"Game loaded!";
@@ -522,4 +610,10 @@ newGameButton.addEventListener("click", () => {
 		player.controls.lock();
 		hideLoadingIndicator();
 	}, 1000);
+});
+
+document.addEventListener("keydown", (e) => {
+	if (e.code === "KeyR") {
+		world.setRainEnabled(!world.enableRain);
+	}
 });
