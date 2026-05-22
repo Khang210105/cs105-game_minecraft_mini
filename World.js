@@ -1152,7 +1152,7 @@ export class World {
 
 					block.userData.isDraining = true;
 
-					const drainSpeed = fluidId === BLOCK_TYPES.LAVA.id ? 0.006 : 0.015;
+					const drainSpeed = fluidId === BLOCK_TYPES.LAVA.id ? 0.010 : 0.015;
 
 					const drainInterval = setInterval(() => {
 						if (!this.blocks.includes(block)) {
@@ -1169,7 +1169,7 @@ export class World {
 							return;
 						}
 					}, 16);
-				}, dist * 180);
+				}, dist * 480);
 
 				const directions = [
 					{ dx: 1, dy: 0, dz: 0 },
