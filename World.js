@@ -132,17 +132,18 @@ export class World {
 	initEnvironmentObjects() {
 		this.sunLight = new THREE.DirectionalLight(0xfff4e5, 1.2);
 		this.sunLight.castShadow = true;
-		this.sunLight.position.set(50, 100, 50);
+		this.sunLight.position.set(50, 120, 50); // sửa lại 29/5
 		this.sunLight.shadow.mapSize.width = 2048;
 		this.sunLight.shadow.mapSize.height = 2048;
 		this.sunLight.shadow.camera.near = 0.5;
-		this.sunLight.shadow.camera.far = 150;
-		this.sunLight.shadow.camera.left = -50;
-		this.sunLight.shadow.camera.right = 50;
-		this.sunLight.shadow.camera.top = 50;
-		this.sunLight.shadow.camera.bottom = -50;
-		this.sunLight.shadow.bias = -0.00015;
-		this.sunLight.shadow.normalBias = 0.03;
+		this.sunLight.shadow.camera.far = 250; // sửa lại 29/5
+
+		this.sunLight.shadow.camera.left = -35; // sửa lại 29/5
+		this.sunLight.shadow.camera.right = 35; // sửa lại 29/5
+		this.sunLight.shadow.camera.top = 70; // sửa lại 29/5
+		this.sunLight.shadow.camera.bottom = -35; // sửa lại 29/5
+		this.sunLight.shadow.bias = -0.0004; // sửa lại 29/5
+		this.sunLight.shadow.normalBias = 0.002; // sửa lại 29/5
 		this.sunLight.target.position.set(0, 0, 0);
 		this.engine.scene.add(this.sunLight);
 		this.engine.scene.add(this.sunLight.target);
@@ -253,23 +254,31 @@ export class World {
 	applyDayNight(scene, camera) {
 		if (!scene || !camera) return;
 
-		const radius = 60;
+		const radius = 90; // Tăng nhẹ bán kính để bao phủ tường cao tốt hơn
 		camera.getWorldPosition(this.cameraWorldPos);
 
 		const px = this.cameraWorldPos.x;
 		const py = this.cameraWorldPos.y;
 		const pz = this.cameraWorldPos.z;
 
-		const x = px + radius * Math.cos(this.timeOfDay);
-		const y = py + radius * Math.sin(this.timeOfDay);
+		// Tính toán góc xoay ngày đêm
+		const cosTime = Math.cos(this.timeOfDay);
+		const sinTime = Math.sin(this.timeOfDay);
 
-		this.sunLight.position.set(x, y, pz);
+		// SỬA TẠI ĐÂY: Tạo góc chiếu xiên 3D thực tế (lệch trục Z một khoảng radius * 0.4)
+		// Thay vì dùng py trực tiếp dễ bị lỗi khi trèo cao, ta khống chế độ cao trần hợp lý
+		const x = px + radius * cosTime;
+		const y = Math.max(py - 20, 0) + radius * sinTime + 20; // Giữ Mặt Trời luôn ở khoảng cách ổn định phía trên thế giới
+		const z = pz + radius * 0.4; // Lệch Z để ánh sáng đổ chéo, giúp hiện rõ bóng của tường cao
+
+		this.sunLight.position.set(x, y, z);
 		this.sunMesh.position.copy(this.sunLight.position);
 
 		this.sunLight.target.position.set(px, py, pz);
 		this.sunLight.target.updateMatrixWorld();
 
-		const daylight = Math.max(0, Math.min(1, (y - py) / radius + 0.2));
+		// Tính toán ánh sáng dựa trên cao độ tương đối
+		const daylight = Math.max(0, Math.min(1, sinTime + 0.2));
 		const nightFactor = 1 - daylight;
 
 		scene.background = new THREE.Color().lerpColors(
@@ -284,9 +293,12 @@ export class World {
 		this.sunMesh.visible = this.enableSunLight;
 		this.ambientLight.visible = this.enableAmbientLight;
 
-		const moonX = px - radius * Math.cos(this.timeOfDay);
-		const moonY = py - radius * Math.sin(this.timeOfDay);
-		this.moonLight.position.set(moonX, moonY, pz);
+		// SỬA TẠI ĐÂY: Áp dụng tương tự cho Mặt Trăng ban đêm
+		const moonX = px - radius * cosTime;
+		const moonY = Math.max(py - 20, 0) - radius * sinTime + 20;
+		const moonZ = pz - radius * 0.4; // Đổ bóng đêm ngược hướng ban ngày
+
+		this.moonLight.position.set(moonX, moonY, moonZ);
 		this.moonMesh.position.copy(this.moonLight.position);
 		this.moonLight.target.position.set(px, py, pz);
 		this.moonLight.target.updateMatrixWorld();
@@ -391,79 +403,87 @@ export class World {
 	}
 
 	addBlock(x, y, z, type, flowLevel = null, isSource = false) {
-			x = Math.round(x);
-			y = Math.round(y);
-			z = Math.round(z);
-	
-			const existingBlock = this.getBlock(x, y, z);
-			if (existingBlock) {
-				if (existingBlock.userData.type.solid) return null; 
-				this.removeBlock(existingBlock); 
-			}
-	
-			const newBlock = this.engine.createBlock(x, y, z, type);
-			newBlock.castShadow = true;
-			newBlock.receiveShadow = true;
-			newBlock.castShadow = y > 0 && !type.isFluid && !type.transparent;
-        	newBlock.receiveShadow = !type.isFluid;
-			newBlock.userData.gridPos = { x, y, z };
-			
-			this.blocks.push(newBlock);
-			const key = this.getKey(x, y, z);
-			this.blockMap.set(key, newBlock);
-	
-			// --- HỆ THỐNG CAO ĐỘ NƯỚC/LAVA CHUẨN XÁC ---
-			if (type.isFluid) {
-				newBlock.userData.flowLevel = flowLevel !== null ? flowLevel : type.maxFlow;
-				newBlock.userData.isSource = (flowLevel === null) || isSource;
-				
-				const targetHeight = Math.max(0.1, (newBlock.userData.flowLevel / type.maxFlow) * 0.9);
-				newBlock.userData.targetHeight = targetHeight;
-	
-				// 1. KIỂM TRA KHỐI Ở TRÊN ĐẦU
-				const blockAbove = this.getBlock(x, y + 1, z);
-				if (blockAbove && blockAbove.userData.type.isFluid) {
-					// Bị chất lỏng khác đè lên -> Phình to 1.0 để nối liền mạch cột nước
-					newBlock.userData.targetHeight = 1.0;
-					newBlock.scale.set(1, 1.0, 1);
-					newBlock.position.y = y; // Giữ nguyên tọa độ chuẩn
-				} else {
-					// Không bị đè -> Là bề mặt, lùn xuống một chút và dâng lên từ từ
-					if (newBlock.userData.isSource) {
-						newBlock.scale.set(1, targetHeight, 1);
-						newBlock.position.y = y - (1 - targetHeight) / 2;
-					} else {
-						newBlock.scale.set(1, 0.01, 1);
-						newBlock.position.y = y - (1 - 0.01) / 2;
-						this.animatingFluids.push(newBlock);
-					}
-				}
-	
-				// 2. KIỂM TRA KHỐI Ở DƯỚI ĐÁY
-				// Nếu có chất lỏng ở dưới, thì chất lỏng đó không còn là "bề mặt" nữa -> Phải phình to lên
-				const blockBelow = this.getBlock(x, y - 1, z);
-				if (blockBelow && blockBelow.userData.type.isFluid) {
-					blockBelow.userData.targetHeight = 1.0;
-					blockBelow.scale.set(1, 1.0, 1);
-					blockBelow.position.y = y - 1; 
-					
-					// Nếu cục dưới đang nằm trong hàng chờ dâng lên, thì cho nó hoàn thành luôn để khỏi bị lỗi
-					const animIndex = this.animatingFluids.indexOf(blockBelow);
-					if (animIndex > -1) {
-						this.animatingFluids.splice(animIndex, 1);
-					}
-				}
-	
-				this.activeFluids.push(newBlock); 
-			}
-	
-			// --- ĐĂNG KÝ VÀO DANH SÁCH LAVA MỖI KHI CÓ LAVA ĐƯỢC TẠO RA ---
-			if (type.id === BLOCK_TYPES.LAVA.id) {
-				this.activeLavaBlocks.push(newBlock);
-			}
-	
-			return newBlock;
+		x = Math.round(x);
+		y = Math.round(y);
+		z = Math.round(z);
+
+		const existingBlock = this.getBlock(x, y, z);
+		if (existingBlock) {
+			if (existingBlock.userData.type.solid) return null; 
+			this.removeBlock(existingBlock); 
 		}
+
+		const newBlock = this.engine.createBlock(x, y, z, type);
+		
+		// ========================================================
+		// SỬA TẠI ĐÂY: SỬA LẠI LOGIC ĐỔ BÓNG CHUẨN XÁC CHO BLOCK
+		// ========================================================
+		// - Tất cả khối đặc (solid) dù xây cao bao nhiêu cũng PHẢI phát bóng (castShadow) và nhận bóng (receiveShadow).
+		// - Chất lỏng (isFluid) sẽ không phát bóng và không nhận bóng để tránh lỗi sọc đen loang lổ trên mặt nước.
+		const isFluid = type.isFluid || type.id === BLOCK_TYPES.WATER?.id || type.id === BLOCK_TYPES.LAVA?.id;
+
+		newBlock.castShadow = !isFluid; 
+		newBlock.receiveShadow = !isFluid;
+		// ========================================================
+
+		newBlock.userData.gridPos = { x, y, z };
+		
+		this.blocks.push(newBlock);
+		const key = this.getKey(x, y, z);
+		this.blockMap.set(key, newBlock);
+
+		// --- HỆ THỐNG CAO ĐỘ NƯỚC/LAVA CHUẨN XÁC (Giữ nguyên logic của bạn) ---
+		if (type.isFluid) {
+			newBlock.userData.flowLevel = flowLevel !== null ? flowLevel : type.maxFlow;
+			newBlock.userData.isSource = (flowLevel === null) || isSource;
+			
+			const targetHeight = Math.max(0.1, (newBlock.userData.flowLevel / type.maxFlow) * 0.9);
+			newBlock.userData.targetHeight = targetHeight;
+
+			// 1. KIỂM TRA KHỐI Ở TRÊN ĐẦU
+			const blockAbove = this.getBlock(x, y + 1, z);
+			if (blockAbove && blockAbove.userData.type.isFluid) {
+				// Bị chất lỏng khác đè lên -> Phình to 1.0 để nối liền mạch cột nước
+				newBlock.userData.targetHeight = 1.0;
+				newBlock.scale.set(1, 1.0, 1);
+				newBlock.position.y = y; // Giữ nguyên tọa độ chuẩn
+			} else {
+				// Không bị đè -> Là bề mặt, lùn xuống một chút và dâng lên từ từ
+				if (newBlock.userData.isSource) {
+					newBlock.scale.set(1, targetHeight, 1);
+					newBlock.position.y = y - (1 - targetHeight) / 2;
+				} else {
+					newBlock.scale.set(1, 0.01, 1);
+					newBlock.position.y = y - (1 - 0.01) / 2;
+					this.animatingFluids.push(newBlock);
+				}
+			}
+
+			// 2. KIỂM TRA KHỐI Ở DƯỚI ĐÁY
+			// Nếu có chất lỏng ở dưới, thì chất lỏng đó không còn là "bề mặt" nữa -> Phải phình to lên
+			const blockBelow = this.getBlock(x, y - 1, z);
+			if (blockBelow && blockBelow.userData.type.isFluid) {
+				blockBelow.userData.targetHeight = 1.0;
+				blockBelow.scale.set(1, 1.0, 1);
+				blockBelow.position.y = y - 1; 
+				
+				// Nếu cục dưới đang nằm trong hàng chờ dâng lên, thì cho nó hoàn thành luôn để khỏi bị lỗi
+				const animIndex = this.animatingFluids.indexOf(blockBelow);
+				if (animIndex > -1) {
+					this.animatingFluids.splice(animIndex, 1);
+				}
+			}
+
+			this.activeFluids.push(newBlock); 
+		}
+
+		// --- ĐĂNG KÝ VÀO DANH SÁCH LAVA MỖI KHI CÓ LAVA ĐƯỢC TẠO RA ---
+		if (type.id === BLOCK_TYPES.LAVA.id) {
+			this.activeLavaBlocks.push(newBlock);
+		}
+
+		return newBlock;
+	}
 	
 		// --- THUẬT TOÁN LOANG (FLOOD FILL) ---
 		tickFluids(delta) {
