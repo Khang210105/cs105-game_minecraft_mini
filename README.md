@@ -2,7 +2,7 @@
 Để trải nghiệm trò chơi một cách nhanh chóng nhất, bạn có thể khởi chạy trực tiếp trên trình duyệt thông qua công cụ Live Server theo 3 bước cực kỳ đơn giản dưới đây:
 
 Bước 1: Tải mã nguồn về máy (Git Clone)
-Mở Terminal trên máy tính của bạn, di chuyển đến thư mục muốn lưu dự án và chạy lệnh:
+Mở Terminal trên máy tính của bạn, di chuyển đến thư mục muốn lưu dự án và chạy lệnh sau từ nhánh main:
 
 git clone https://github.com/Khang210105/cs105-game_minecraft_mini.git
 
