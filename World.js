@@ -414,23 +414,57 @@ export class World {
 		}
 
 		const newBlock = this.engine.createBlock(x, y, z, type);
-		
-		// ========================================================
-		// SỬA TẠI ĐÂY: SỬA LẠI LOGIC ĐỔ BÓNG CHUẨN XÁC CHO BLOCK
-		// ========================================================
-		// - Tất cả khối đặc (solid) dù xây cao bao nhiêu cũng PHẢI phát bóng (castShadow) và nhận bóng (receiveShadow).
-		// - Chất lỏng (isFluid) sẽ không phát bóng và không nhận bóng để tránh lỗi sọc đen loang lổ trên mặt nước.
-		const isFluid = type.isFluid || type.id === BLOCK_TYPES.WATER?.id || type.id === BLOCK_TYPES.LAVA?.id;
 
-		newBlock.castShadow = !isFluid; 
-		newBlock.receiveShadow = !isFluid;
 		// ========================================================
+		// CẬP NHẬT LOGIC ĐỔ BÓNG: LOẠI TRỪ THỦY TINH (GLASS) KHÔNG NHẬN BÓNG
+		// ========================================================
+		const isFluid = type.isFluid || type.id === BLOCK_TYPES.WATER?.id || type.id === BLOCK_TYPES.LAVA?.id;
+		const isGlass = type.id === BLOCK_TYPES.GLASS?.id; 
+
+		// Kính (isGlass) sẽ KHÔNG phát bóng (castShadow = false) và KHÔNG nhận bóng (receiveShadow = false)
+		newBlock.castShadow = !isFluid && !isGlass; 
+		newBlock.receiveShadow = !isFluid && !isGlass;
+		// ========================================================
+
+
 
 		newBlock.userData.gridPos = { x, y, z };
 		
 		this.blocks.push(newBlock);
 		const key = this.getKey(x, y, z);
 		this.blockMap.set(key, newBlock);
+
+		if (isGlass) {
+			newBlock.material.needsUpdate = true;
+		}
+
+		if (type.id === BLOCK_TYPES.CHEST?.id && this.cameraRef) {
+			const direction = new THREE.Vector3();
+			this.cameraRef.getWorldDirection(direction);
+
+			// Tính góc nhìn của người chơi trên mặt phẳng ngang
+			const angle = Math.atan2(direction.x, direction.z);
+			
+			// Làm tròn về 4 hướng vuông góc: 0, 90, 180, 270 độ (đơn vị Radian)
+			const snappedAngle = Math.round(angle / (Math.PI / 2)) * (Math.PI / 2);
+			
+			// Cộng thêm góc Pi (180 độ) để mặt khóa (+Z) quay ngược lại hướng về mắt người chơi
+			newBlock.rotation.y = snappedAngle + Math.PI;
+		}
+
+		if (type.id === BLOCK_TYPES.PUMPKIN?.id && this.cameraRef) {
+			const direction = new THREE.Vector3();
+			this.cameraRef.getWorldDirection(direction);
+
+			// Tính góc nhìn của người chơi trên mặt phẳng ngang
+			const angle = Math.atan2(direction.x, direction.z);
+			
+			// Làm tròn về 4 hướng vuông góc: 0, 90, 180, 270 độ (đơn vị Radian)
+			const snappedAngle = Math.round(angle / (Math.PI / 2)) * (Math.PI / 2);
+			
+			// Cộng thêm góc Pi (180 độ) để mặt khóa (+Z) quay ngược lại hướng về mắt người chơi
+			newBlock.rotation.y = snappedAngle + Math.PI;
+		}
 
 		// --- HỆ THỐNG CAO ĐỘ NƯỚC/LAVA CHUẨN XÁC (Giữ nguyên logic của bạn) ---
 		if (type.isFluid) {

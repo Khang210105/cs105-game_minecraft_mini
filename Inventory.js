@@ -27,25 +27,29 @@ export class Inventory {
     createBlockIcon(blockType) {
         const icon = document.createElement('div');
         icon.className = 'block-icon';
-        icon.style.imageRendering = 'pixelated'; // Giúp ảnh Minecraft sắc nét, không bị mờ
+        icon.style.imageRendering = 'pixelated'; // Giúp ảnh sắc nét không bị mờ
 
-        // 1. Trường hợp block có 6 mặt (mảng textures) -> Lấy mặt đầu tiên (index 0) làm icon
+        // ========================================================
+        // CHỐNG LẶP ẢNH (SỬA LỖI HIỂN THỊ ĐÁM 9 BLOCK)
+        // ========================================================
+        icon.style.backgroundRepeat = 'no-repeat';  // Tắt tính năng tự động lặp lại ảnh
+        icon.style.backgroundSize = 'cover';        // Ép bức ảnh kéo dãn phủ kín hoàn toàn ô icon
+        icon.style.backgroundPosition = 'center';   // Căn bức ảnh luôn nằm chính giữa ô
+        // ========================================================
+
+        // 1. Trường hợp block có 6 mặt (mảng textures)
         if (blockType.textures && blockType.textures.length > 0) {
-            icon.style.backgroundImage = `url('${blockType.textures[0]}')`;
-            icon.style.backgroundSize = 'cover';
+            const specialBlockNames = ['Chest', 'Pumpkin', 'Tnt'];
+            const useFrontFace = specialBlockNames.includes(blockType.name) && blockType.textures.length >= 5;
+            
+            const textureUrl = useFrontFace ? blockType.textures[4] : blockType.textures[0];
+            icon.style.backgroundImage = `url(${textureUrl})`;
         } 
-        // 2. Trường hợp block có 1 ảnh chung (texture)
+        // 2. Trường hợp block dùng chung 1 texture cho tất cả các mặt
         else if (blockType.texture) {
-            icon.style.backgroundImage = `url('${blockType.texture}')`;
-            icon.style.backgroundSize = 'cover';
-        } 
-        // 3. Trường hợp block chỉ có màu trơn
-        else if (blockType.color !== undefined) {
-            icon.style.backgroundColor = '#' + blockType.color.toString(16).padStart(6, '0');
-        } 
-        // 4. Mặc định nếu không có gì
-        else {
-            icon.style.backgroundColor = '#cccccc'; // Màu xám mặc định
+            icon.style.backgroundImage = `url(${blockType.texture})`;
+        } else if (blockType.color) {
+            icon.style.backgroundColor = `#${blockType.color.toString(16).padStart(6, '0')}`;
         }
 
         return icon;
@@ -58,27 +62,31 @@ export class Inventory {
 
     // --- RENDER GIAO DIỆN ---
     renderHotbar() {
-        const hotbarUI = document.getElementById('hotbar');
-        hotbarUI.innerHTML = ''; // Xóa cũ
+        const hotbarContainer = document.getElementById('hotbar');
+        if (!hotbarContainer) return;
+        hotbarContainer.innerHTML = '';
 
-        for (let i = 0; i < 8; i++) {
-            const slotDiv = document.createElement('div');
-            slotDiv.className = `hotbar-slot ${i === this.activeSlotIndex ? 'active' : ''}`;
-            
-            const numberSpan = document.createElement('span');
-            numberSpan.className = 'slot-number';
-            numberSpan.innerText = i + 1;
-            slotDiv.appendChild(numberSpan);
+        this.slots.forEach((blockType, index) => {
+            const slot = document.createElement('div');
+            slot.className = `hotbar-slot ${index === this.activeSlotIndex ? 'active' : ''}`;
 
-            // SỬA Ở ĐÂY: Dùng hàm tạo icon mới
-            const blockType = this.slots[i];
             if (blockType) {
                 const icon = this.createBlockIcon(blockType);
-                slotDiv.appendChild(icon);
+                slot.appendChild(icon);
+
+                // ========================================================
+                // THÊM TẠI ĐÂY: Hiện tên khi di chuột vào ô dưới thanh hotbar
+                // ========================================================
+                slot.title = blockType.name;
+                // ========================================================
             }
 
-            hotbarUI.appendChild(slotDiv);
-        }
+            slot.addEventListener('click', () => {
+                this.handleSlotClick(index);
+            });
+
+            hotbarContainer.appendChild(slot);
+        });
     }
 
     renderInventoryMenu() {
@@ -89,10 +97,23 @@ export class Inventory {
             const itemDiv = document.createElement('div');
             itemDiv.className = 'inv-item';
             
-            // SỬA Ở ĐÂY: Dùng hàm tạo icon mới
+            // Tạo icon cho block
             const icon = this.createBlockIcon(type);
             itemDiv.appendChild(icon);
 
+            // ========================================================
+            // SỬA TẠI ĐÂY: Gán title vào đúng biến itemDiv để hiện tên khi di chuột
+            // ========================================================
+            itemDiv.title = type.name; 
+            // ========================================================
+
+            // Lắng nghe sự kiện click để đưa vào thanh hotbar
+            itemDiv.addEventListener('click', () => {
+                this.slots[this.activeSlotIndex] = type;
+                this.renderHotbar();
+            });
+
+            // Theo dõi trạng thái di chuột (giữ nguyên logic gốc của bạn)
             itemDiv.addEventListener('mouseenter', () => this.hoveredBlockType = type);
             itemDiv.addEventListener('mouseleave', () => this.hoveredBlockType = null);
 

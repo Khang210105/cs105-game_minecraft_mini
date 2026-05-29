@@ -18,10 +18,10 @@ export const BLOCK_TYPES = {
     DIRT:  { id: 2, name: 'Dirt',  color: 0xffffff, texture: './textures/blocks/dirt.png',  solid: true },
     STONE: { id: 3, name: 'Stone', color: 0xffffff, texture: './textures/blocks/stone.png', solid: true },
     GLASS: { id: 4, name: 'Glass', color: 0xffffff, texture: './textures/blocks/glass.png', transparent: true, solid: true, opacity: 0.6 },
-    IRON_ORE: { id: 5, name: 'Iron_ore', color: 0xffffff, texture: './textures/blocks/iron_ore.png', solid: true },
-    IRON_BLOCK: { id: 6, name: 'Iron_block', color: 0xffffff, texture: './textures/blocks/iron_block.png', solid: true },
-    SEA_GRASS: { id: 7, name: 'Sea_grass', texture: './textures/blocks/seagrass_carried.png', solid: false, isPlant: true, transparent: true },
-    BED_ROCK: { id: 8, name: 'Bed_rock', color: 0xffffff, texture: './textures/blocks/bedrock.png', solid: true },
+    IRON_ORE: { id: 5, name: 'Iron ore', color: 0xffffff, texture: './textures/blocks/iron_ore.png', solid: true },
+    IRON_BLOCK: { id: 6, name: 'Iron block', color: 0xffffff, texture: './textures/blocks/iron_block.png', solid: true },
+    SEA_GRASS: { id: 7, name: 'Sea grass', texture: './textures/blocks/seagrass_carried.png', solid: false, isPlant: true, transparent: true },
+    BED_ROCK: { id: 8, name: 'Bedrock', color: 0xffffff, texture: './textures/blocks/bedrock.png', solid: true },
 
     WATER: { 
         id: 9, name: 'Water',
@@ -93,17 +93,17 @@ export const BLOCK_TYPES = {
         name: "Chest",
         solid: true,
         textures: [
-            "./textures/blocks/chest_front.png",
-            "./textures/blocks/chest_side.png",
-            "./textures/blocks/chest_top.png",
-            "./textures/blocks/chest_top.png",
-            "./textures/blocks/chest_side.png",
-            "./textures/blocks/chest_side.png",
+            "./textures/blocks/chest_side.png",  // 1. Phải (+X)
+            "./textures/blocks/chest_side.png",  // 2. Trái (-X)
+            "./textures/blocks/chest_top.png",   // 3. Trên (+Y)
+            "./textures/blocks/chest_top.png",   // 4. Dưới (-Y)
+            "./textures/blocks/chest_front.png", // 5. Trước (+Z) -> MẶT KHÓA CHUẨN
+            "./textures/blocks/chest_side.png",  // 6. Sau (-Z)
         ]
     },
     CHISELED_TUFF: {
         id: 19,
-        name: "Chiseled_tuff",
+        name: "Chiseled tuff",
         solid: true,
         textures: [
             "./textures/blocks/chiseled_tuff.png",
@@ -116,7 +116,7 @@ export const BLOCK_TYPES = {
     },
     CRAFTED_TABLE: {
         id: 20,
-        name: "Crafted_table",
+        name: "Crafted table",
         solid: true,
         textures: [
             "./textures/blocks/crafting_table_front.png",
@@ -127,12 +127,12 @@ export const BLOCK_TYPES = {
             "./textures/blocks/crafting_table_side.png",
         ]
     },
-    DIAMOND_ORE: { id: 21, name: 'Diamond_ore', color: 0xffffff, texture: './textures/blocks/diamond_ore.png', solid: true },
-    DIAMOND_BLOCK: { id: 22, name: 'Diamond_block', color: 0xffffff, texture: './textures/blocks/diamond_block.png', solid: true },
-    FLOWER_DANDELION: { id: 23, name: 'Flower_dandelion', textures: ["./textures/blocks/flower_dandelion.png"], solid: false, isPlant: true, transparent: true },
+    DIAMOND_ORE: { id: 21, name: 'Diamond ore', color: 0xffffff, texture: './textures/blocks/diamond_ore.png', solid: true },
+    DIAMOND_BLOCK: { id: 22, name: 'Diamond block', color: 0xffffff, texture: './textures/blocks/diamond_block.png', solid: true },
+    FLOWER_DANDELION: { id: 23, name: 'Flower dandelion', textures: ["./textures/blocks/flower_dandelion.png"], solid: false, isPlant: true, transparent: true },
     GRASS_SNOW: { 
         id: 24, 
-        name: 'Grass_snow', 
+        name: 'Grass snow', 
         color: 0xffffff,
         textures: [
             './textures/blocks/grass_block_snow.png', // 1. Phải
@@ -144,7 +144,7 @@ export const BLOCK_TYPES = {
         ],
         solid: true 
     },
-    OAK_SAMPLING: { id: 25, name: 'Oak_sampling', textures: ["./textures/blocks/sapling_oak.png"], solid: false, isPlant: true, transparent: true },
+    OAK_SAMPLING: { id: 25, name: 'Oak sampling', textures: ["./textures/blocks/sapling_oak.png"], solid: false, isPlant: true, transparent: true },
     TNT: { 
         id: 26, 
         name: 'TNT', 
@@ -189,5 +189,5 @@ export const BLOCK_TYPES = {
         transparent: true,
         opacity: 0.6,
     },
-    PLANK:  { id: 30, name: 'Plank',  color: 0xffffff, texture: './textures/blocks/planks_oak.png',  solid: true },
+    PLANK:  { id: 30, name: 'Wood plank',  color: 0xffffff, texture: './textures/blocks/planks_oak.png',  solid: true },
 };
