@@ -11,6 +11,9 @@ export class BlockEngine {
 		this.cubeGeometry = new THREE.BoxGeometry(1, 1, 1);
 		this.planeGeometry = new THREE.PlaneGeometry(1, 1); // Dùng cho cây cỏ
 		this.textureLoader = new THREE.TextureLoader();
+		this.textureCache = new Map();
+		this.materialCache = new Map();
+		this.fluidMaterialSet = new Set();
 
 		// Danh sách material chất lỏng để animate sprite sheet
 		this.fluidMaterials = [];
@@ -23,6 +26,11 @@ export class BlockEngine {
 	}
 
 	loadPixelTexture(url) {
+		if (!url) return null;
+
+		const cached = this.textureCache.get(url);
+		if (cached) return cached;
+
 		const texture = this.textureLoader.load(url, (tex) => {
 			// Nếu ảnh là sprite sheet dạng dọc (cao > rộng)
 			if (tex.image && tex.image.height > tex.image.width) {
@@ -42,22 +50,57 @@ export class BlockEngine {
 		texture.wrapS = THREE.RepeatWrapping;
 		texture.wrapT = THREE.RepeatWrapping;
 
+		this.textureCache.set(url, texture);
 		return texture;
+	}
+
+	getTypeCacheKey(type) {
+		if (type && type.id !== undefined && type.id !== null) {
+			return `id:${type.id}`;
+		}
+
+		const textureKey = Array.isArray(type?.textures)
+			? type.textures.join("|")
+			: type?.texture || "";
+
+		return [
+			type?.name || "",
+			textureKey,
+			type?.color ?? "",
+			type?.transparent ?? "",
+			type?.opacity ?? "",
+			type?.isPlant ?? "",
+			type?.isFluid ?? "",
+			type?.emissive ?? "",
+			type?.intensity ?? "",
+		].join("::");
+	}
+
+	getCachedMaterial(cacheKey, createMaterial) {
+		const cached = this.materialCache.get(cacheKey);
+		if (cached) return cached;
+
+		const material = createMaterial();
+		this.materialCache.set(cacheKey, material);
+		return material;
 	}
 
 	createBlock(x, y, z, type = BLOCK_TYPES.GRASS) {
 		let object3D;
+		const typeKey = this.getTypeCacheKey(type);
 
 		// PLANT (2 plane cross)
 		if (type.isPlant) {
 			const plantTex =
 				type.texture || (Array.isArray(type.textures) ? type.textures[0] : null);
 
-			const material = new THREE.MeshStandardMaterial({
-				map: plantTex ? this.loadPixelTexture(plantTex) : null,
-				transparent: true,
-				alphaTest: 0.5,
-				side: THREE.DoubleSide,
+			const material = this.getCachedMaterial(`plant:${typeKey}`, () => {
+				return new THREE.MeshStandardMaterial({
+					map: plantTex ? this.loadPixelTexture(plantTex) : null,
+					transparent: true,
+					alphaTest: 0.5,
+					side: THREE.DoubleSide,
+				});
 			});
 
 			object3D = new THREE.Group();
@@ -90,7 +133,9 @@ export class BlockEngine {
 				materialConfig.emissiveIntensity = type.intensity || 1;
 			}
 
-			const material = new THREE.MeshStandardMaterial(materialConfig);
+			const material = this.getCachedMaterial(`fluid:${typeKey}`, () => {
+				return new THREE.MeshStandardMaterial(materialConfig);
+			});
 
 			object3D = new THREE.Mesh(this.cubeGeometry, material);
 
@@ -98,7 +143,10 @@ export class BlockEngine {
 			object3D.castShadow = false;
 			object3D.receiveShadow = false;
 
-			this.fluidMaterials.push(material);
+			if (!this.fluidMaterialSet.has(material)) {
+				this.fluidMaterialSet.add(material);
+				this.fluidMaterials.push(material);
+			}
 		}
 		// NORMAL BLOCK
 		else {
@@ -110,18 +158,24 @@ export class BlockEngine {
 			};
 
 			if (type.textures) {
-				materials = type.textures.map(
-					(url) =>
-						new THREE.MeshStandardMaterial({
-							...materialConfig,
-							map: this.loadPixelTexture(url),
-						}),
-				);
+				materials = this.getCachedMaterial(`block_multi:${typeKey}`, () => {
+					return type.textures.map(
+						(url) =>
+							new THREE.MeshStandardMaterial({
+								...materialConfig,
+								map: this.loadPixelTexture(url),
+							}),
+					);
+				});
 			} else if (type.texture) {
-				materialConfig.map = this.loadPixelTexture(type.texture);
-				materials = new THREE.MeshStandardMaterial(materialConfig);
+				materials = this.getCachedMaterial(`block_single:${typeKey}`, () => {
+					materialConfig.map = this.loadPixelTexture(type.texture);
+					return new THREE.MeshStandardMaterial(materialConfig);
+				});
 			} else {
-				materials = new THREE.MeshStandardMaterial(materialConfig);
+				materials = this.getCachedMaterial(`block_color:${typeKey}`, () => {
+					return new THREE.MeshStandardMaterial(materialConfig);
+				});
 			}
 
 			object3D = new THREE.Mesh(this.cubeGeometry, materials);

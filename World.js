@@ -74,7 +74,7 @@ export class World {
 		// Rain
 		this.enableRain = false;
 		this.rain = {
-			count: 2500,      // số giọt (tăng/giảm tùy FPS)
+			count: 1000,      // số giọt (tăng/giảm tùy FPS)
 			radius: 35,       // bán kính vùng mưa quanh player
 			height: 25,       // chiều cao vùng mưa
 			speed: 18,        // tốc độ rơi
@@ -595,7 +595,11 @@ export class World {
 
 							// NẾU ĐANG NẰM DƯỚI HƯ KHÔNG -> BIẾN MẤT CẤP TỐC (drainSpeed cực đại)
 							const isAtVoid = block.userData.gridPos.y < -25;
-							const drainSpeed = isAtVoid ? 0.5 : (fluidId === BLOCK_TYPES.LAVA.id ? 0.010 : 0.015); //
+							const drainSpeed = isAtVoid
+								? 0.5
+								: type.id === BLOCK_TYPES.LAVA.id
+									? 0.010
+									: 0.015; //
 
 							block.scale.y -= drainSpeed;
 							block.position.y -= drainSpeed * 0.5;

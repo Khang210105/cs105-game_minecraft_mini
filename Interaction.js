@@ -11,6 +11,9 @@ export class Interaction {
         this.mouse = new THREE.Vector2(0, 0); 
         this.limit = 4.5; // Kéo dài tầm với ra một chút để dễ đào dưới nước
         this.inventory = inventory;
+        this.selectionRaycastIntervalMs = 66; // 15hz
+        this.lastSelectionRaycastAt = 0;
+        this.cachedTargetBlock = null;
 
         const geometry = new THREE.BoxGeometry(1.01, 1.01, 1.01); 
         const edges = new THREE.EdgesGeometry(geometry);
@@ -152,35 +155,48 @@ export class Interaction {
     update() {
         if (!this.player.controls.isLocked) {
             this.selectionBox.visible = false;
+            this.cachedTargetBlock = null;
             return;
         }
 
-        this.raycaster.setFromCamera(this.mouse, this.player.camera);
-        const intersects = this.raycaster.intersectObjects(this.world.blocks, true);
+        const now = performance.now();
+        const shouldRaycast = (now - this.lastSelectionRaycastAt) >= this.selectionRaycastIntervalMs;
 
-        let targetIntersect = null;
-        let targetBlock = null;
+        if (shouldRaycast) {
+            this.lastSelectionRaycastAt = now;
+            this.raycaster.setFromCamera(this.mouse, this.player.camera);
+            const intersects = this.raycaster.intersectObjects(this.world.blocks, true);
 
-        for (let i = 0; i < intersects.length; i++) {
-            let obj = intersects[i].object;
-            
-            // Giải mã Group cho viền đen
-            if (obj.parent && obj.parent.type === 'Group') {
-                obj = obj.parent;
+            let targetIntersect = null;
+            let targetBlock = null;
+
+            for (let i = 0; i < intersects.length; i++) {
+                let obj = intersects[i].object;
+                
+                // Giải mã Group cho viền đen
+                if (obj.parent && obj.parent.type === 'Group') {
+                    obj = obj.parent;
+                }
+
+                // Check an toàn 3 lớp
+                const isFluid = obj.userData && obj.userData.type && obj.userData.type.isFluid === true;
+                
+                if (!isFluid) {
+                    targetIntersect = intersects[i]; 
+                    targetBlock = obj; 
+                    break;
+                }
             }
 
-            // Check an toàn 3 lớp
-            const isFluid = obj.userData && obj.userData.type && obj.userData.type.isFluid === true;
-            
-            if (!isFluid) {
-                targetIntersect = intersects[i]; 
-                targetBlock = obj; 
-                break;
+            if (targetIntersect && targetIntersect.distance <= this.limit) {
+                this.cachedTargetBlock = targetBlock;
+            } else {
+                this.cachedTargetBlock = null;
             }
         }
 
-        if (targetIntersect && targetIntersect.distance <= this.limit) {
-            this.selectionBox.position.copy(targetBlock.position); 
+        if (this.cachedTargetBlock) {
+            this.selectionBox.position.copy(this.cachedTargetBlock.position); 
             this.selectionBox.visible = true;
         } else {
             this.selectionBox.visible = false;
