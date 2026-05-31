@@ -588,20 +588,23 @@ export class World {
 						block.userData.isDraining = true;
 	
 						const drainInterval = setInterval(() => {
-	
 							if (!this.blocks.includes(block)) {
 								clearInterval(drainInterval);
 								return;
 							}
-	
-							block.scale.y -= 0.03;
-							block.position.y -= 0.015;
-	
+
+							// NẾU ĐANG NẰM DƯỚI HƯ KHÔNG -> BIẾN MẤT CẤP TỐC (drainSpeed cực đại)
+							const isAtVoid = block.userData.gridPos.y < -25;
+							const drainSpeed = isAtVoid ? 0.5 : (fluidId === BLOCK_TYPES.LAVA.id ? 0.010 : 0.015); //
+
+							block.scale.y -= drainSpeed;
+							block.position.y -= drainSpeed * 0.5;
+
 							if (block.scale.y <= 0.05) {
 								clearInterval(drainInterval);
 								this.removeBlock(block);
+								return;
 							}
-	
 						}, 16);
 	
 						continue;
@@ -1112,6 +1115,23 @@ export class World {
 			}
 
 			this.rainPoints.geometry.attributes.position.needsUpdate = true;
+		}
+
+		const VOID_LIMIT_Y = -25; // Giới hạn độ cao hư không (Dưới đáy bản đồ)
+
+		// Duyệt NGƯỢC mảng chất lỏng đang hoạt động để xóa an toàn không bị bỏ sót phần tử
+		for (let i = this.activeFluids.length - 1; i >= 0; i--) {
+			const block = this.activeFluids[i];
+			if (!block || !block.userData || !block.userData.gridPos) continue;
+
+			// Nếu khối chất lỏng rơi vượt quá ranh giới bản đồ xuống hư không
+			if (block.userData.gridPos.y < VOID_LIMIT_Y) {
+				// Loại bỏ ngay lập tức khỏi mảng tính toán dòng chảy
+				this.activeFluids.splice(i, 1);
+				
+				// Xóa triệt để khối Mesh khỏi thế giới đồ họa 3D
+				this.removeBlock(block);
+			}
 		}
 
 		this.fireAnimationTime += delta;
